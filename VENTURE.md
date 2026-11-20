@@ -159,11 +159,21 @@ the guide /how-to-make-a-multi-page-tiff/ (combine and split; ImageMagick/tiffcp
 defects are fixed: fax/bilevel PDF pages are 1-bit Flate (libtiff's g3test.tif: 49 KB TIFF → 44 KB PDF, was 529 KB), and an IFD with no
 NewSubfileType tag that is ≤ 1/3 of the previous page's size, same aspect, ≤ 512 px is a thumbnail (dscf0013.tif: 1 page, was 2).
 `npm test` now runs test files one at a time (`--test-concurrency=1`): each file rebuilds `dist/`, and in parallel they collided.
+**Resize, max file size, PNG compression (session 10):** every converter page now has **Resize** (Original size / Fit within W × H, never
+enlarges / Exact size, one side may be empty to keep proportions / Percent; large reductions step down 2× at a time so fine detail does not
+alias), **Max file size** (KB; JPG/WebP/AVIF: bisection for the highest quality ≤ the slider that fits, floor 30%; if none fits, the dimensions
+shrink so the next round lands near 60% quality; PNG: lossless, else 256 colours, else smaller; the row shows the quality used or warns when the
+target was not reached) and **Colours** for PNG (Lossless / 256…16: our own indexed-colour PNG writer `extension/lib/png-quant.js`, subagent:
+RGBA-aware median cut + k-means, Floyd–Steinberg, PLTE + tRNS, 1/2/4/8-bit). Pages with `sameFormat` offer **Same as original** (JPG→JPG,
+PNG→PNG, WebP→WebP, HEIC→JPG, others→PNG) and keep the input file untouched when re-saving would not make it smaller. Engine options:
+`resize`, `targetBytes`, `pngColors` in `convertBlob` (`outputSize()` exported). New pages (subagent content): /compress-image/, /compress-jpg/,
+/compress-png/, /resize-image/, /compress-image-to-100kb/, /-50kb/, /-20kb/, listed under "Compress and resize" on /guides/. The extension
+does not use the new options; its `convert.js` now imports `png-quant.js` (extension tests passed with it in CI; not repacked or uploaded).
 **/guides/ index (session 8, subagent):** one card per guide plus converters grouped by source format; footer shows 3 guides + "All guides →";
 "Guides" in the header nav. **Store screenshot 2** (`docs/store/screenshot-2-1280x800.png`, the real save-all popup with stubbed data,
 made by `scripts/store-assets.mjs`) is listed in `store/chrome-privacy.md` and `STORE.md` for the operator to upload.
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 36 converter pages (+3 TIFF pages in session 8, +4 →TIFF pages in session 9), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
+**Website** (live, https://janwan2003.github.io/save-image-format/): 43 converter pages (+7 compress/resize pages in session 10, +3 TIFF pages in session 8, +4 →TIFF pages in session 9), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
 our own GIF89a encoder `extension/lib/gif.js`: median-cut palette, optional Floyd–Steinberg dithering, 1-bit transparency, LZW; GIF
 is also on the index format menu, not in the extension menu) (index,
 webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
@@ -172,7 +182,7 @@ jfif→jpg/png, image→pdf, favicon generator),
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 51 URLs (session 8: +3 TIFF pages, +/guides/; session 9: +4 →TIFF pages, +1 guide). Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 58 URLs (session 8: +3 TIFF pages, +/guides/; session 9: +4 →TIFF pages, +1 guide; session 10: +7 compress/resize pages). Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -281,6 +291,26 @@ g3test.tif → PDF 44 KB (was 529 KB); dscf0013.tif → 1 row (was 2); the other
 Screenshots of the tool (1100 px light, 390 px dark) looked right after fixing a Compression select that overflowed at 390 px. `web-ext lint`
 on the 0.4.3 Firefox zip: 0 errors, 1 warning (UNSUPPORTED_API, offscreen). CWS `--status`: crxVersion 0.4.3. IndexNow 51 URLs (HTTP 200),
 sitemap resubmitted (204).
+**Verified (2026-11-20, session 10):** `npm test` 160 tests, 159 pass, 1 skipped (pngcheck not installed) in GitHub Actions run 44769356383
+on commit 538a326; Pages run 44769356180. Locally the first full run was 158/160 with 1 real failure (the /guides/ test counted groups by source
+format; the new "Compress and resize" group is intended, test updated, then 15/15 for the 3 affected files). New: `tests/resize.test.mjs` (7:
+`outputSize` unit cases; fit 2000×1500 → 800×600, exact width 300 → 300×225, percent 10%; 1-px stripes reduced 8× come out grey (mean ≈128,
+spread < 12); 150 KB target met within 70–100% of the limit at quality 30–90% without resizing, 20 KB by shrinking with the aspect ratio kept,
+1 KB by a thumbnail; palette PNG has colour type 3 and is < 60% of lossless; PNG 60 KB target met; control visibility per format; Same as
+original keeps JPG/PNG and keeps a file that would grow), `tests/png-quant.test.mjs` (10, subagent: exact round trips at depths 1/2/4/8, alpha
+error on a photo with an alpha ramp ≤ 4.5/255, every file read back pixel-identically by Pillow 12.1.1 and our own reader; 12 MP in 1.1 s
+(no dither) / 2.7 s (dither) in Node), `tests/compress-pages.test.mjs` (4, subagent: title/h1/canonical/description/sitemap/JSON-LD, home
+links, control defaults). Two bugs caught by the new tests before pushing: `png-quant.js` was missing from the site build's copy list, and
+`app.js` read `const` helpers before initialisation (TDZ). **Live** after Pages run 44769356180: the 7 pages and `/lib/png-quant.js` return
+200, sitemap 58 <loc>; in headless Chromium a 4032×3024 JPG became 20,333 bytes on /compress-image-to-20kb/ (384×288, quality 57%, 1.2 s),
+1920×1440 on /resize-image/ (0.4 s) and a 256-colour PNG on /compress-png/ (1.9 s); 0 console errors, 0 requests outside janwan2003.github.io.
+Screenshots of /compress-image-to-50kb/ (1100 px light) and /resize-image/ (390 px dark) looked right. IndexNow 58 URLs (HTTP 200), sitemap
+resubmitted (204).
+**Not verified (session 10):** palette PNGs opened outside Chromium/Pillow (Photoshop, Windows Photos); the "could not get under …" warning path
+(no test input reached it: even 1 KB is reachable by shrinking); Firefox and Safari for the new controls (only Chromium; the Firefox site test
+did not exercise them); memory/time on 48 MP inputs with a target size (each round re-renders; up to 14 rounds); downscale quality versus a
+Lanczos reference (only the stripes aliasing check); search demand for the 7 pages is assumed from the general popularity of "compress image
+to 100kb"-type queries, no volume source was fetched this session.
 **Not verified (session 9):** our TIFFs opened in Photoshop, Windows Photos, macOS Preview or a print shop's RIP (only libtiff/Pillow,
 ImageMagick and our decoder read them; the pages' "GIMP, Photoshop, Preview read LZW" is general knowledge); 1-bit and grey PDF pages in
 Adobe Reader/Preview (poppler-free check: structure + pixel bits); the extension's PDF with the shared change was covered only by the
@@ -325,6 +355,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    output for 1-bit TIFF pages (fax systems want it; LZW 1-bit is ~same size as G3 input only by luck), a DPI setting for TIFF/PDF output
    (print shops ask for 300 dpi; we write 72), speed up LZW decoding (24 MP noise: 4 s), an "open TIFF files on Windows/Mac" guide,
    TIFF in the extension menu only if users ask. Search demand for jpg/png→tiff was assumed, not measured: check it in GSC from December.
+4a2. Compress/resize follow-ups (session 10): watch GSC for the 7 compress/resize URLs against the converters from December; if they get
+   impressions, add more sizes (200 KB, 10 KB) and a "passport photo size" style crop tool only with a sourced size table; offer Resize and
+   Max file size in the extension's save-all popup (forms are where 20–100 KB limits come from); a before/after zoom preview so users can
+   judge quality; PNG target size could try 128/64 colours before shrinking.
 4b. Real-photo coverage: try an HDR iPhone photo (gain map) and a 48 MP HEIC (memory/time), e.g. from libheif's or Apple's public samples.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
@@ -339,6 +373,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-20 (session 10): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
+  CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: 0 errors/warnings, no search analytics rows for
+  2026-10-23..2026-11-20.
 
 - 2026-11-20 (session 9): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
   CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: sitemap pending, 0 errors/warnings, no search analytics rows
@@ -419,3 +457,7 @@ The site's converter pages could later carry one unobtrusive ad slot.
   TIFF"), subagent pages jpg/png/webp/heic→tiff + multi-page TIFF guide (sitemap 46 → 51); session 8's TIFF defects fixed (fax PDF pages
   1-bit lossless: g3test 529 → 44 KB; unmarked camera thumbnails skipped); extension 0.4.3 to the CWS draft. Evidence: Actions run
   44764487964 139/139, Pages run 44764488177, Pillow/libtiff readback of every writer case, live 3-page HEIC+fax TIFF, IndexNow 51 URLs.
+- 2026-11-20 builder (session 10): Resize (fit/exact/percent), Max file size (quality search, then smaller dimensions) and palette-PNG
+  compression (own writer `png-quant.js`, subagent) on every converter page, "Same as original" output; 7 compress/resize pages (subagent
+  content; sitemap 51 → 58). Evidence: Actions run 44769356383 159 pass / 1 skipped, Pages run 44769356180, live 4032×3024 JPG → 20,333 B on
+  /compress-image-to-20kb/, Pillow readback of every palette PNG case, IndexNow 58 URLs.
