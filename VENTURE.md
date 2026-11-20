@@ -80,29 +80,38 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
 
 Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Format" is an existing listing, so not used).
 
-**Extension** (`extension/`, MV3, no build step, no dependencies, v0.1.0):
-- Right-click image → Save image as → PNG / JPG / WebP (AVIF only where the browser's canvas can
-  write it; Chrome 159 cannot, so not shown there) / Copy as PNG.
+**Extension** (`extension/`, MV3, no build step, no dependencies, v0.2.0):
+- Right-click image → Save image as → PNG / JPG / WebP / PDF (AVIF only where the browser's canvas can
+  write it; Chrome 159 cannot, so not shown there) / Copy as PNG. PDF (added in v0.2.0) = one page, page size
+  set in settings (same as image by default, or A4 / US Letter), JPEG quality shared with JPG.
+- PDF and ICO are written by our own code (`extension/lib/pdf.js`, `makeIco` in `extension/lib/convert.js`):
+  PDF 1.4 with JPEG (DCTDecode) or, at 100% quality, lossless zlib RGB (FlateDecode) pages; ICO with PNG entries.
 - Fetch order: extension fetch (works for CORS-enabled CDNs and the page's own site via activeTab) →
   fetch from inside the page (cookies/referrer; `blob:` URLs) → popup asking for access to that one
   image host (optional host permission, revocable in settings). Install warning is only "Manage your downloads".
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
   settings page (quality, Save dialog on/off, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.1.0-chrome.zip` (16 files) and
-  `packages/saveform-0.1.0-firefox.zip` (14 files: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.2.0-chrome.zip` and
+  `packages/saveform-0.2.0-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
   offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
   AMO validation 0 errors / 1 warning (guarded `offscreen` call), 1 screenshot. Check with `python3 scripts/amo-submit.py --status`.
+  v0.2.0 (PDF) upload validated on AMO (0 errors, 1 warning) on 2026-11-20, but creating the version got HTTP 429
+  (throttled, "available in 2717 seconds"); see the Log for whether the retry went through.
+  `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
 - **Chrome Web Store: blocked.** `scripts/cws-upload.py` gets a valid token but the upload returns 403 SERVICE_DISABLED:
   the Chrome Web Store API is not enabled in the operator's Google Cloud project (inbox request filed 2026-11-20).
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 16 converter pages (index,
-webp→png/jpg, avif→png/jpg, png→webp/jpg, jpg→webp/png, svg→png/jpg, gif→png/jpg, bmp→png/jpg, ico→png),
+**Website** (live, https://janwan2003.github.io/save-image-format/): 22 converter pages (index,
+webp→png/jpg/pdf, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf, svg→png/jpg, gif→png/jpg, bmp→png/jpg, ico→png,
+jfif→jpg/png),
 3 guides (/how-to-save-webp-as-png/, /why-images-save-as-webp/, /save-image-as-type-alternative/), plus privacy, extension and 404 pages;
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
-as the extension. Sitemap with 21 URLs. Deployed by `.github/workflows/pages.yml`.
+as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
+combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
+unchanged by default (rename only). Sitemap with 27 URLs. Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -120,23 +129,41 @@ as the extension. Sitemap with 21 URLs. Deployed by `.github/workflows/pages.yml
 Firefox 158 via geckodriver 0.37.1: menu built, same-site WebP→PNG, CORS WebP→JPG, SVG→PNG on the event page, data:→WebP,
 Copy as PNG reports success; clipboard contents not read back). `web-ext lint` on the Firefox zip: 0 errors, 1 warning.
 
+**Verified (2026-11-20, session 3):** `npm test` 41/41 locally and in GitHub Actions run 44737512237 (Chromium + Firefox 160,
+poppler installed so the PDF render check ran). New cases: jpg→pdf (A4 orientation, reorder, combine, "fit" size, rendered by
+poppler `pdftoppm` with image centred and white margins), png→pdf lossless (exact pixel values after inflate), png→ico (4 PNG
+entries, sizes, transparent padding), jfif→jpg (identical bytes; re-encode when unticked), extension Save as PDF in Chromium
+(same-site and SVG via offscreen) and in Firefox 158. `web-ext lint` on the 0.2.0 Firefox zip: 0 errors, 1 warning (offscreen).
+Live after Pages run 44737512247: `/`, the 6 new pages, `/lib/pdf.js`, `/extension/` return 200 (`/png-to-ico/` once 503, then
+200 on 3 retries); sitemap has 27 <loc>; live /jpg-to-pdf/ in headless Chromium combined two JPGs into a 2-page PDF
+(portrait + landscape A4, rendered by poppler), 0 console errors, 0 requests outside github.io.
+Visual check: screenshots of /jpg-to-pdf/ (light) and /png-to-ico/ (dark) with two files added looked right.
+
 **Not verified:** Firefox with a real context-menu click and the real per-site permission prompt, the real Chrome permission prompt (cannot be
 automated; the test pre-grants access), logged-in sites (Instagram, X, Facebook), images in
-cross-origin iframes, Google Images thumbnails, AVIF output.
+cross-origin iframes, Google Images thumbnails, AVIF output. PDFs opened in Adobe Reader or macOS Preview (only poppler
+and our own parser checked them). ICO files opened in Windows Explorer (only Chromium decoded them).
 
 ## Next steps
 
 1. **Operator:** enable the Chrome Web Store API in Google Cloud project 964988236925 (OPERATOR-INBOX.md, 2026-11-20).
    Then run `python3 scripts/cws-upload.py`, and the operator fills the listing in the dashboard once (`STORE.md`, `docs/store/`).
-2. Check the AMO review (`python3 scripts/amo-submit.py --status`). When approved: put the AMO link on
+2. Check the AMO review (`python3 scripts/amo-submit.py --status`). If version 0.2.0 is not listed, run
+   `python3 scripts/amo-submit.py` again (it was throttled on 2026-11-20). When approved: put the AMO link on
    `site/content/extension.html` and in `calloutHtml()` in `scripts/build-site.mjs`, update the guide in `site/guides.mjs`,
    and start recording AMO users/ratings in `## Metrics`. If rejected, read the reviewer's note and resubmit.
 3. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 4. Features users of the old extension expect: "Save as" for page background images, keyboard
    shortcut, optional filename pattern; "save all images on page" (a later premium candidate).
-5. More search pages: avif→webp (needs an AVIF fixture), png/jpg→avif once Chrome can encode AVIF; "save image as jpg
+5. More search pages: image→pdf / "combine images into PDF", jpg→ico, svg→ico, heic→jpg (needs a WASM decoder; check the
+   licence first), avif→webp (needs an AVIF fixture), png/jpg→avif once Chrome can encode AVIF; "save image as jpg
    firefox"/"edge" guides. Check the guides' unsourced claims (macOS Preview export, CDN `format=`/`fm=` parameters).
 6. Search Console / Bing Webmaster sitemap submission (needs the operator's account).
+
+## Metrics
+
+No channel metrics yet (2026-11-20): AMO listing not public (status `nominated`, `amo-submit.py --status`), CWS not uploaded,
+site not in Search Console (needs operator). First readable numbers will be AMO users after approval.
 
 ## Monetization plan
 
@@ -161,3 +188,7 @@ The site's converter pages could later carry one unobtrusive ad slot.
   34/34 locally and in Actions run 44735974439 (Firefox 160 + Chromium; the 6 Firefox cases ran, 0 skipped); Pages run
   44735974246; live: 8 new/changed URLs return 200, sitemap has 21 <loc>, /extension/ shows the "in review" badge;
   AMO API status call (nominated); web-ext lint 0 errors.
+- 2026-11-20 builder (session 3): added PDF and ICO output (own writers, no dependencies), Save as PDF in the extension
+  (v0.2.0), and 6 converter pages (jpg/png/webp→pdf, png→ico, jfif→jpg/png; sitemap 21 → 27 URLs). Evidence: `npm test` 41/41
+  locally and in Actions run 44737512237; Pages run 44737512247; live jpg→pdf conversion rendered by poppler; web-ext lint 0
+  errors. CWS upload re-tried: still 403 SERVICE_DISABLED. AMO 0.2.0 version creation throttled (429), retry scheduled.
