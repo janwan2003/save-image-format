@@ -33,6 +33,31 @@ function handler(req, res) {
     </body>`);
     return;
   }
+  if (url.pathname === '/lazy.html') {
+    // Lazy-loading patterns: placeholders in src, the real address in data-* attributes.
+    const gif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    const svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'/%3E";
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(`<!doctype html><title>Lazy</title><body>
+      <img id="real" src="/img/one.webp" alt="loaded">
+      <img id="ds" src="${gif}" data-src="/img/lazy-one.webp" width="320" height="240" alt="data-src">
+      <img id="dss" src="${gif}" data-srcset="/img/lz-s.webp 300w, /img/lz-l.webp 1200w, /img/lz-m.webp 600w">
+      <picture id="pic">
+        <source type="image/avif" data-srcset="/img/pic-s.avif 400w, /img/pic-l.avif 1600w">
+        <source type="image/webp" data-srcset="/img/pic-m.webp 900w">
+        <img src="${svg}" data-src="/img/pic-fallback.jpg" alt="picture">
+      </picture>
+      <img id="icon" src="${gif}" data-original="/img/icon.webp" width="40" height="40">
+      <img id="unknown" src="" data-src="/img/unknown.webp">
+      <img id="empty" src="" alt="no address, no lazy attribute">
+      <img id="lss" src="${gif}" data-lazy-srcset="/img/ls-1x.webp 1x, /img/ls-2x.webp 2x">
+      <img id="dup1" src="${gif}" data-lazy-src="/img/one.webp">
+      <img id="dup2" data-lazy="/img/lazy-one.webp">
+      <div style="height:6000px"></div>
+      <img id="below" loading="lazy" src="/img/below.webp" width="500" height="300" alt="below the fold">
+    </body>`);
+    return;
+  }
   const f = fixtures[url.pathname.split('/').pop()];
   if (!f) { res.writeHead(404); res.end(); return; }
   const headers = { 'content-type': f.type };
@@ -179,6 +204,72 @@ test('collects <img>, the largest srcset candidate, SVG and CSS backgrounds', as
   assert.ok(!by('/small.webp') && !by('/mid.webp'), 'only one entry for the srcset image');
   assert.equal(by('/hero.webp').kind, 'background');
   assert.deepEqual([by('/pixel.webp').width, by('/pixel.webp').height], [1, 1]);
+});
+
+async function openLazyPage() {
+  const p = await context.newPage();
+  await p.goto(`http://127.0.0.1:${pagePort}/lazy.html`);
+  const id = await sw.evaluate(async (u) => (await chrome.tabs.query({ url: u }))[0].id, `http://127.0.0.1:${pagePort}/lazy.html`);
+  return { p, id };
+}
+
+test('collects lazy-loaded images that have not loaded yet (data-src, data-srcset, picture, loading=lazy)', async () => {
+  const { p, id } = await openLazyPage();
+  try {
+    // The scenario is real: the loading=lazy image below the fold has not been fetched.
+    assert.equal(await p.evaluate(() => document.getElementById('below').currentSrc), '');
+    const r = await sw.evaluate(async (id) => {
+      const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: id }, func: globalThis.saveform.collectPageImages });
+      return result;
+    }, id);
+    const srcs = r.images.map((x) => x.src);
+    const by = (end) => r.images.filter((x) => x.src.endsWith(end));
+    const one = (end) => { const m = by(end); assert.equal(m.length, 1, `${end} once in ${JSON.stringify(srcs)}`); return m[0]; };
+    const size = (end) => { const x = one(end); return [x.width, x.height]; };
+    assert.ok(!srcs.some((s) => s.startsWith('data:')), `no data: placeholders: ${JSON.stringify(srcs)}`);
+    assert.ok(!srcs.some((s) => s.endsWith('/lazy.html')), 'src="" is not listed as the page address');
+    // Loaded image and a lazy duplicate of it (data-lazy-src): listed once, with the decoded size.
+    assert.deepEqual(size('/img/one.webp'), [160, 120]);
+    // data-src behind a data: GIF; size from the width/height attributes. data-lazy duplicate: once.
+    assert.deepEqual(size('/img/lazy-one.webp'), [320, 240]);
+    assert.equal(one('/img/lazy-one.webp').alt, 'data-src');
+    // data-srcset: largest w candidate only.
+    assert.deepEqual(size('/img/lz-l.webp'), [1200, 0]);
+    assert.ok(!by('/lz-s.webp').length && !by('/lz-m.webp').length);
+    // <picture>: largest candidate across the sources (AVIF is fine), not the img's own fallback.
+    assert.deepEqual(size('/img/pic-l.avif'), [1600, 0]);
+    assert.ok(!by('/pic-s.avif').length && !by('/pic-m.webp').length && !by('/pic-fallback.jpg').length);
+    assert.deepEqual(size('/img/icon.webp'), [40, 40]); // data-original
+    assert.deepEqual(size('/img/unknown.webp'), [0, 0]); // empty src, no size attributes
+    assert.deepEqual(size('/img/ls-2x.webp'), [0, 0]); // data-lazy-srcset with x descriptors: highest
+    assert.ok(!by('/ls-1x.webp').length);
+    // loading="lazy" below the fold: listed with its src address, size from the attributes.
+    assert.deepEqual(size('/img/below.webp'), [500, 300]);
+    assert.equal(r.images.length, 8, JSON.stringify(srcs));
+  } finally {
+    await p.close();
+  }
+});
+
+test('popup shows unknown-size (0x0) lazy images with the size filter on', async () => {
+  const { p, id } = await openLazyPage();
+  const popup = await context.newPage();
+  try {
+    await popup.goto(`chrome-extension://${extId}/popup.html?tabId=${id}`);
+    await popup.waitForSelector('#grid li');
+    assert.equal(await popup.inputValue('#minSize'), '100');
+    const titles = await popup.locator('#grid .meta').evaluateAll((els) => els.map((e) => e.title));
+    const shown = (end) => titles.some((t) => t.endsWith(end));
+    assert.ok(shown('/img/unknown.webp'), `0x0 image shown: ${JSON.stringify(titles)}`);
+    assert.ok(shown('/img/ls-2x.webp') && shown('/img/lz-l.webp') && shown('/img/pic-l.avif') && shown('/img/below.webp'));
+    // A lazy image whose attributes say it is small (40x40) is still filtered.
+    assert.ok(!shown('/img/icon.webp'));
+    assert.equal(titles.length, 7);
+    assert.match(await popup.textContent('#message'), /1 smaller image is hidden/);
+  } finally {
+    await popup.close();
+    await p.close();
+  }
 });
 
 test('ZIP of PNGs: same-site, CORS CDN, srcset and SVG; non-CORS site asks, then is skipped', async () => {

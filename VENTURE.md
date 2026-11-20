@@ -221,7 +221,9 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    listing; the popup is the clearest difference from the 400K-user PNG-only competitor.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
-   lazy-loaded images (`data-src`) that have not loaded yet, images inside same-origin iframes.
+   images inside same-origin iframes, lazy CSS backgrounds (`data-bg`-style attributes) and `<noscript>` fallbacks.
+   Done (unreleased, after 0.4.0): not-yet-loaded lazy `<img>` (data-src / data-lazy-src / data-original / data-lazy,
+   data-srcset / data-lazy-srcset, `<picture><source>`), listed as unknown size when they have no size attributes.
 7. More search pages: heic→jpg/png (largest volume; needs a WASM decoder: `libheif-js` 1.23.5 is LGPL-3.0, 9 MB unpacked, and
    no HEIC encoder exists on this machine for a test fixture: ImageMagick here reads HEIC but cannot write it, so a public
    sample with a clear licence is needed), avif→webp (needs an AVIF fixture), "save image as jpg in
