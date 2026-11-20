@@ -461,3 +461,5 @@ The site's converter pages could later carry one unobtrusive ad slot.
   compression (own writer `png-quant.js`, subagent) on every converter page, "Same as original" output; 7 compress/resize pages (subagent
   content; sitemap 51 → 58). Evidence: Actions run 44769356383 159 pass / 1 skipped, Pages run 44769356180, live 4032×3024 JPG → 20,333 B on
   /compress-image-to-20kb/, Pillow readback of every palette PNG case, IndexNow 58 URLs.
+  CI on the doc commit 6667d2f (run 44770195566) failed 158/160: a race in the new PNG max-size test (ticking the box converts at the default
+  100 KB first; the test read that 95 KB file). Test-only defect, fixed by waiting for the shown size ≤ 60 KB; 3/3 local runs pass.

@@ -246,13 +246,15 @@ test('PNG colours: a 256-colour palette PNG is much smaller than lossless; max f
 
   await page.selectOption('#png-colors', '0');
   await page.check('#target-on');
-  const prev = await page.locator('#results li a.btn').getAttribute('href');
   await page.fill('#target-kb', '60');
-  // Each conversion gets a new blob: URL; wait for the one made with the 60 KB limit.
-  await page.waitForFunction((prev) => {
-    const a = document.querySelector('#results li[data-state="done"] a.btn');
-    return a && a.getAttribute('href') !== prev && !document.querySelector('#results li[data-state="working"], #results li[data-state="queued"]');
-  }, prev, { timeout: 30000 });
+  // Ticking the box already re-converts with the default 100 KB, and the 60 KB conversion follows after a
+  // debounce, so wait until the row is idle and its current file is within 60 KB (times out if never).
+  // (The page's CSP blocks fetch() of blob: URLs, so read the size the row shows; the bytes are checked below.)
+  await page.waitForFunction(() => {
+    if (document.querySelector('#results li[data-state="working"], #results li[data-state="queued"]')) return false;
+    const m = (document.querySelector('#results li[data-state="done"] .result-meta')?.textContent || '').match(/→ PNG ([\d.]+) (B|KB|MB)/);
+    return !!m && (m[2] === 'B' || (m[2] === 'KB' && Number(m[1]) <= 60));
+  }, null, { timeout: 30000, polling: 250 });
   const small = (await downloadRow(page)).bytes;
   assert.ok(small.length <= 60 * 1024, `${small.length} bytes`);
   await page.close();
