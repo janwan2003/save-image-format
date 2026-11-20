@@ -439,6 +439,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
 
 ## Metrics
 
+- 2026-11-20 (session 12): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
+  CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: sitemap pending, 0 errors/warnings, no search analytics rows for
+  2026-10-23..2026-11-20.
+
 - 2026-11-20 (session 11): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
   CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: 0 errors/warnings, no search analytics rows for
   2026-10-23..2026-11-20.
@@ -536,3 +540,10 @@ The site's converter pages could later carry one unobtrusive ad slot.
   72–300 dpi select, password/invalid PDF errors) + /pdf-to-jpg/, /pdf-to-png/, /pdf-to-tiff/ (sitemap 58 → 61). Evidence: Actions run
   44777103765 162 pass / 0 fail / 1 skipped, Pages run 44777103818, new pdf.test.mjs vs poppler, 6 real PDFs + JPX/G4/CMYK PDFs vs poppler,
   live 23-page conversion in 3.3 s (github.io only), IndexNow 61 URLs.
+- 2026-11-20 builder (session 12): camera RAW input (embedded camera JPEG, own `raw.js`) + PSD/PSB input (own decoder in a worker,
+  subagent) on every converter page; /raw-to-jpg/, /cr2-to-jpg/, /cr3-to-jpg/, /nef-to-jpg/, /psd-to-png/, /psd-to-jpg/ (sitemap 61 → 67).
+  Evidence: 12 real RAW files from raw.pixls.us vs LibRaw (rawpy) preview size, 12/12 equal, all converted in Chromium in 3.4 s; PSD decoder
+  vs ImageMagick on 348 psd-tools files (313 within 2; rest explained in Status); Actions run 44781832867 (RAW commit d055eb0) 171 pass / 1
+  skipped and 44782854370 (8fa9e1c) 199 pass / 0 fail / 1 skipped, Pages run 44782854425; live github.io: CR3+DNG+NEF (45 MB) → JPG in 4.6 s,
+  3 PSD fixtures + 10 real psd-tools files → PNG, 0 console errors, requests only to github.io; IndexNow 67 URLs (200), sitemap resubmitted (204).
+  Found by tests: RAW output named `x.NEF.jpg` (fixed via outName); Pentax preview ending at EOF was missed (fixed).
