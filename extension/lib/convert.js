@@ -4,6 +4,7 @@
 import { makePdf, pageFromCanvas } from './pdf.js';
 import { encodeGif } from './gif.js';
 import { makeTiff, tiffPage } from './tiff-write.js';
+import { encodePng8 } from './png-quant.js';
 
 export const FORMATS = {
   png: { id: 'png', mime: 'image/png', ext: 'png', label: 'PNG', lossy: false, opaque: false },
@@ -128,7 +129,11 @@ export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null, pr
  * options: quality (0..1, lossy formats; PDF at 1 = lossless), background (CSS color for
  * JPG/PDF), svgMinSize, pageSize ('fit' | 'a4' | 'letter', PDF), icoSizes (ICO),
  * dither (GIF, default true: Floyd–Steinberg when the image has more than 256 colours),
- * tiffCompression ('lzw' default | 'none'), preview (PDF/TIFF: also return a small PNG `preview`).
+ * tiffCompression ('lzw' default | 'none'), preview (PDF/TIFF: also return a small PNG `preview`),
+ * resize ({ mode: 'percent' | 'fit' | 'exact', width, height, percent }, see outputSize; not ICO),
+ * targetBytes (JPG/WebP/AVIF/PNG: the best result of at most this many bytes, see fitToBytes),
+ * pngColors (PNG: 0 = lossless, else a palette PNG with at most this many colours).
+ * Results also carry sourceWidth/sourceHeight, resized, and with targetBytes: targetMet, quality or colors.
  * Returns { blob, width, height, sourceKind } and, for PDF, pdfPage / for TIFF, tiffPage (to combine pages later).
  */
 const WEBP_MAX = 16383;
@@ -139,38 +144,55 @@ export async function convertBlob(input, formatId, options = {}) {
   const quality = fmt.lossy ? clamp(options.quality ?? (formatId === 'jpg' || formatId === 'pdf' ? 0.92 : 0.9), 0.01, 1) : undefined;
   const img = await decode(input, options);
   try {
+    const out = formatId === 'ico' ? { width: img.width, height: img.height } : outputSize(img.width, img.height, options.resize);
+    const resized = out.width !== img.width || out.height !== img.height;
     // The WebP format stores width and height in 14 bits; Chromium crops larger canvases silently.
-    if (formatId === 'webp' && Math.max(img.width, img.height) > WEBP_MAX) {
-      const e = new Error(`WebP images can be at most ${WEBP_MAX.toLocaleString('en-US')} pixels wide or tall, and this one is ${img.width} × ${img.height}. Choose PNG or JPG instead.`);
+    if (formatId === 'webp' && Math.max(out.width, out.height) > WEBP_MAX) {
+      const e = new Error(`WebP images can be at most ${WEBP_MAX.toLocaleString('en-US')} pixels wide or tall, and ${resized ? 'the resized image would be' : 'this one is'} ${out.width} × ${out.height}. Choose ${resized ? 'a smaller size, or ' : ''}PNG or JPG instead.`);
       e.code = 'too-large'; throw e;
     }
-    const canvas = makeCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-    if (fmt.opaque) {
-      ctx.fillStyle = options.background || '#ffffff';
-      ctx.fillRect(0, 0, img.width, img.height);
+    const render = (w, h) => {
+      const c = makeCanvas(w, h);
+      const g = c.getContext('2d');
+      if (fmt.opaque) {
+        g.fillStyle = options.background || '#ffffff';
+        g.fillRect(0, 0, w, h);
+      }
+      drawScaled(g, img, w, h);
+      return [c, g];
+    };
+    const [canvas, ctx] = render(out.width, out.height);
+    const base = { width: out.width, height: out.height, sourceKind: img.kind, sourceWidth: img.width, sourceHeight: img.height, resized };
+    const targetBytes = options.targetBytes > 0 && (fmt.lossy || formatId === 'png') && formatId !== 'pdf' ? Math.round(options.targetBytes) : 0;
+    if (targetBytes) {
+      const r = await fitToBytes(render, canvas, ctx, out, fmt, targetBytes, { ...options, quality });
+      return { ...base, ...r, resized: r.width !== img.width || r.height !== img.height };
     }
-    ctx.drawImage(img.source, 0, 0, img.width, img.height);
+    if (formatId === 'png' && options.pngColors > 0) {
+      const { data } = ctx.getImageData(0, 0, out.width, out.height);
+      const png = await encodePng8(data, out.width, out.height, { maxColors: options.pngColors, dither: options.dither !== false });
+      return { ...base, blob: new Blob([png], { type: fmt.mime }), colors: options.pngColors };
+    }
     if (formatId === 'pdf') {
       const pdfPage = await pageFromCanvas(canvas, ctx, quality, canvasToBlob);
       const blob = makePdf([pdfPage], { pageSize: options.pageSize });
       const preview = options.preview ? await previewOf(canvas) : undefined;
-      return { blob, width: img.width, height: img.height, sourceKind: img.kind, pdfPage, preview };
+      return { ...base, blob, pdfPage, preview };
     }
     if (formatId === 'ico') {
       const blob = await makeIco(img, options.icoSizes || ICO_SIZES);
-      return { blob, width: img.width, height: img.height, sourceKind: img.kind };
+      return { ...base, blob };
     }
     if (formatId === 'tiff') {
-      const { data } = ctx.getImageData(0, 0, img.width, img.height);
-      const page = tiffPage(data, img.width, img.height, { compression: options.tiffCompression });
+      const { data } = ctx.getImageData(0, 0, out.width, out.height);
+      const page = tiffPage(data, out.width, out.height, { compression: options.tiffCompression });
       const preview = options.preview ? await previewOf(canvas) : undefined;
-      return { blob: makeTiff([page]), width: img.width, height: img.height, sourceKind: img.kind, tiffPage: page, preview };
+      return { ...base, blob: makeTiff([page]), tiffPage: page, preview };
     }
     if (formatId === 'gif') {
-      const { data } = ctx.getImageData(0, 0, img.width, img.height);
-      const gif = encodeGif(data, img.width, img.height, { dither: options.dither !== false });
-      return { blob: new Blob([gif], { type: fmt.mime }), width: img.width, height: img.height, sourceKind: img.kind };
+      const { data } = ctx.getImageData(0, 0, out.width, out.height);
+      const gif = encodeGif(data, out.width, out.height, { dither: options.dither !== false });
+      return { ...base, blob: new Blob([gif], { type: fmt.mime }) };
     }
     const blob = await canvasToBlob(canvas, fmt.mime, quality);
     if (!blob) throw new Error('The browser could not encode the image');
@@ -178,10 +200,137 @@ export async function convertBlob(input, formatId, options = {}) {
       const e = new Error(`This browser cannot create ${fmt.label} files`);
       e.code = 'encode-unsupported'; throw e;
     }
-    return { blob, width: img.width, height: img.height, sourceKind: img.kind };
+    return { ...base, blob };
   } finally {
     img.close();
   }
+}
+
+// ---- resizing ---------------------------------------------------------------
+export const MAX_OUTPUT_SIDE = 16384;
+
+/**
+ * Output size for a resize setting { mode, width, height, percent }:
+ *   'percent' scales both sides; 'fit' shrinks to fit inside width × height (either may be empty)
+ *   and never enlarges; 'exact' uses width × height, or keeps the aspect ratio when one is empty.
+ * Anything else keeps the original size. Sides are at least 1 px; a resize may not go above
+ * MAX_OUTPUT_SIDE on either side (an unresized image keeps whatever size it has).
+ */
+export function outputSize(w, h, resize) {
+  const num = (v) => (Number(v) > 0 && Number.isFinite(Number(v)) ? Number(v) : 0);
+  const rw = num(resize?.width), rh = num(resize?.height), pct = num(resize?.percent);
+  let W = w, H = h;
+  if (resize?.mode === 'percent' && pct) {
+    W = (w * pct) / 100; H = (h * pct) / 100;
+  } else if (resize?.mode === 'fit' && (rw || rh)) {
+    const s = Math.min(1, rw ? rw / w : Infinity, rh ? rh / h : Infinity);
+    W = w * s; H = h * s;
+  } else if (resize?.mode === 'exact' && (rw || rh)) {
+    W = rw || (w * rh) / h;
+    H = rh || (h * rw) / w;
+  } else {
+    return { width: w, height: h };
+  }
+  W = Math.max(1, Math.round(W)); H = Math.max(1, Math.round(H));
+  if (Math.max(W, H) > MAX_OUTPUT_SIDE && Math.max(W, H) > Math.max(w, h)) {
+    const e = new Error(`The resized image would be ${W} × ${H} pixels; the limit is ${MAX_OUTPUT_SIDE.toLocaleString('en-US')} on each side.`);
+    e.code = 'too-large'; throw e;
+  }
+  return { width: W, height: H };
+}
+
+/**
+ * Draw the decoded image at w × h. Large reductions go down in steps of at most 2×, which
+ * keeps fine detail from aliasing where a browser's one-step downscale samples too sparsely.
+ */
+function drawScaled(ctx, img, w, h) {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  let src = img.source, sw = img.width, sh = img.height;
+  if (sw === w && sh === h) { ctx.drawImage(src, 0, 0, w, h); return; }
+  const temps = [];
+  while (sw >= w * 2 * 1.02 && sh >= h * 2 * 1.02) {
+    const nw = Math.max(w, Math.ceil(sw / 2)), nh = Math.max(h, Math.ceil(sh / 2));
+    const c = makeCanvas(nw, nh);
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(src, 0, 0, sw, sh, 0, 0, nw, nh);
+    temps.push(c);
+    src = c; sw = nw; sh = nh;
+  }
+  ctx.drawImage(src, 0, 0, sw, sh, 0, 0, w, h);
+  for (const c of temps) { c.width = 0; c.height = 0; }
+}
+
+// ---- target file size -------------------------------------------------------
+const MIN_TARGET_QUALITY = 0.3; // below this JPEG/WebP turn blocky; smaller dimensions look better
+const QUALITY_STEPS = 7;
+const SHRINK_QUALITY = 0.6;
+
+/**
+ * Find the largest output of at most `maxBytes`. JPG/WebP/AVIF: the highest quality (up to the
+ * chosen one) that fits, by bisection; PNG: lossless if it fits, else a 256-colour palette. If even
+ * that is too big, the dimensions shrink by the square root of the size ratio (measured at 60% quality
+ * for JPG/WebP/AVIF, so the smaller image lands near 60% rather than at the floor) and it tries again.
+ * Returns { blob, width, height, quality?, colors?, targetMet, targetBytes }.
+ */
+async function fitToBytes(render, canvas, ctx, size, fmt, maxBytes, options) {
+  let { width, height } = size;
+  let best = null;
+  for (let round = 0; round < 14; round++) {
+    if (round > 0) [canvas, ctx] = render(width, height);
+    const r = fmt.id === 'png'
+      ? await pngUnder(canvas, ctx, width, height, maxBytes, options, round === 0 ? (options.pngColors || 0) : 256)
+      : await lossyUnder(canvas, fmt, maxBytes, options.quality);
+    if (r.fits) return { blob: r.blob, width, height, quality: r.quality, colors: r.colors, targetMet: true, targetBytes: maxBytes };
+    best = { blob: r.blob, width, height, quality: r.quality, colors: r.colors };
+    if (width === 1 && height === 1) break;
+    // Shrink so that the next round fits at a comfortable quality (60%), not only at the floor:
+    // a slightly smaller picture at 60% looks better than a larger one at 30%.
+    let ref = r.blob.size;
+    if (fmt.id !== 'png') {
+      const q = Math.min(SHRINK_QUALITY, options.quality ?? 0.92);
+      ref = (await canvasToBlob(canvas, fmt.mime, q))?.size || ref;
+    }
+    const s = Math.min(0.9, Math.sqrt(maxBytes / ref) * 0.95);
+    width = Math.max(1, Math.floor(width * s)); height = Math.max(1, Math.floor(height * s));
+  }
+  return { ...best, targetMet: false, targetBytes: maxBytes };
+}
+
+async function lossyUnder(canvas, fmt, maxBytes, maxQuality) {
+  const encode = async (q) => {
+    const blob = await canvasToBlob(canvas, fmt.mime, q);
+    if (!blob) throw new Error('The browser could not encode the image');
+    if (blob.type !== fmt.mime) { const e = new Error(`This browser cannot create ${fmt.label} files`); e.code = 'encode-unsupported'; throw e; }
+    return blob;
+  };
+  const top = maxQuality ?? 0.92;
+  const floor = Math.min(MIN_TARGET_QUALITY, top);
+  const first = await encode(top);
+  if (first.size <= maxBytes || floor === top) return { fits: first.size <= maxBytes, blob: first, quality: top };
+  const bottom = await encode(floor);
+  if (bottom.size > maxBytes) return { fits: false, blob: bottom, quality: floor };
+  let lo = floor, hi = top, good = { blob: bottom, quality: lo };
+  for (let i = 0; i < QUALITY_STEPS; i++) {
+    const q = Math.round(((lo + hi) / 2) * 100) / 100;
+    if (q <= lo || q >= hi) break;
+    const b = await encode(q);
+    if (b.size <= maxBytes) { lo = q; good = { blob: b, quality: q }; } else hi = q;
+  }
+  return { fits: true, ...good };
+}
+
+async function pngUnder(canvas, ctx, w, h, maxBytes, options, colors) {
+  if (!colors) {
+    const lossless = await canvasToBlob(canvas, 'image/png');
+    if (lossless && lossless.size <= maxBytes) return { fits: true, blob: lossless };
+    colors = 256;
+  }
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const png = new Blob([await encodePng8(data, w, h, { maxColors: colors, dither: options.dither !== false })], { type: 'image/png' });
+  return { fits: png.size <= maxBytes, blob: png, colors };
 }
 
 /** A small PNG of the result, for formats an <img> cannot show (PDF, TIFF). */

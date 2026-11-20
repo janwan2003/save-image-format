@@ -9,6 +9,7 @@
   --accent-text: #ffffff;
   --accent-soft: #e6ecfd;
   --ok: #18794e;
+  --warn: #a14a07;
   --err: #b42318;
   --focus: #f59e0b;
   --check-a: #e9ecf1;
@@ -28,6 +29,7 @@
     --accent-text: #0d1020;
     --accent-soft: #232c4a;
     --ok: #5fd39a;
+    --warn: #f0a35c;
     --err: #ff8a80;
     --check-a: #2a2e36;
     --check-b: #1f2228;
@@ -198,3 +200,13 @@ fieldset.control legend { font-weight: 600; float: left; margin-right: 8px; }
 .by-source ul { list-style: none; padding: 0; margin: 0; }
 .by-source li { margin: 0.15em 0; }
 .footer-links span { color: var(--text); }
+
+/* Resize / max file size controls */
+#resize-control { flex-wrap: wrap; }
+#resize-control > label, #target-control > label { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.resize-dims, .resize-pct { display: inline-flex; align-items: center; gap: 6px; }
+.resize-dims[hidden], .resize-pct[hidden] { display: none; }
+#resize-control input[type="number"] { width: 5.5em; }
+#target-kb { width: 6em; }
+#target-kb:disabled { opacity: .55; }
+.result-meta .warn { color: var(--warn, #b45309); }

@@ -60,8 +60,21 @@ const ICON_UPLOAD = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" str
 const ICON_LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
 function toolHtml(page) {
-  const opts = Object.entries({ png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)', gif: 'GIF', tiff: 'TIFF' })
+  const opts = Object.entries({ ...(page.sameFormat ? { same: 'Same as original' } : {}), png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)', gif: 'GIF', tiff: 'TIFF' })
     .map(([id, label]) => `<option value="${id}"${id === page.to ? ' selected' : ''}>${label}</option>`).join('');
+  // Resize, target file size and PNG colours: on every page; a page's `resize`, `targetKb` and
+  // `pngColors` fields only set the starting values.
+  const rz = page.resize || {};
+  const resizeModes = Object.entries({ none: 'Original size', fit: 'Fit within', exact: 'Exact size', percent: 'Percent' })
+    .map(([id, label]) => `<option value="${id}"${id === (rz.mode || 'none') ? ' selected' : ''}>${label}</option>`).join('');
+  const pngColors = [[0, 'Lossless'], [256, '256 (smaller file)'], [128, '128'], [64, '64'], [32, '32'], [16, '16']]
+    .map(([n, label]) => `<option value="${n}"${n === (page.pngColors || 0) ? ' selected' : ''}>${label}</option>`).join('');
+  const resize = `
+      <span class="control" id="resize-control"><label for="resize-mode">Resize</label><select id="resize-mode">${resizeModes}</select>
+        <span class="resize-dims" id="resize-dims"><input type="number" id="resize-width" min="1" max="16384" step="1" placeholder="width" aria-label="Width in pixels" value="${rz.width || ''}"><span aria-hidden="true">×</span><input type="number" id="resize-height" min="1" max="16384" step="1" placeholder="height" aria-label="Height in pixels" value="${rz.height || ''}"> px</span>
+        <span class="resize-pct" id="resize-pct"><input type="number" id="resize-percent" min="1" max="400" step="1" aria-label="Percentage of the original size" value="${rz.percent || 50}"> %</span></span>
+      <span class="control" id="target-control"><label for="target-on"><input type="checkbox" id="target-on"${page.targetKb ? ' checked' : ''}> Max file size</label><input type="number" id="target-kb" min="1" max="100000" step="1" aria-label="Maximum file size in KB" value="${page.targetKb || 100}"> KB</span>
+      <label class="control" id="png-colors-control" for="png-colors"><span>Colours</span><select id="png-colors">${pngColors}</select></label>`;
   const fromLabel = page.from === 'any' ? 'images' : `${FORMAT_LABEL[page.from]} files`;
   const pageSizes = Object.entries({ a4: 'A4', letter: 'US Letter', fit: 'Same as image' })
     .map(([id, label]) => `<option value="${id}"${id === (page.pageSize || 'a4') ? ' selected' : ''}>${label}</option>`).join('');
@@ -82,11 +95,11 @@ function toolHtml(page) {
     </label>
     <div class="controls">
       <label class="control" for="format"><span>Convert to</span><select id="format">${opts}</select></label>
-      <label class="control" id="quality-control" for="quality"><span>Quality</span><input type="range" id="quality" min="10" max="100" step="1" value="90"><output id="quality-out" for="quality">90%</output></label>
+      <label class="control" id="quality-control" for="quality"><span>Quality</span><input type="range" id="quality" min="10" max="100" step="1" value="${page.quality || 90}"><output id="quality-out" for="quality">${page.quality || 90}%</output></label>
       <label class="control" id="bg-control" for="bg"><span>Background</span><input type="color" id="bg" value="#ffffff"></label>
       <label class="control" id="page-size-control" for="page-size"><span>Page size</span><select id="page-size">${pageSizes}</select></label>
       <label class="control" id="tiff-control" for="tiff-compression"><span>Compression</span><select id="tiff-compression"><option value="lzw" selected>LZW (smaller)</option><option value="none">None (uncompressed)</option></select></label>
-      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${keepJpeg}${dither}${svg}
+      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${keepJpeg}${resize}${dither}${svg}
     </div>
     <p class="note" id="format-note" role="status" hidden></p>
     <p class="local-note">${ICON_LOCK}Converted on your device. Nothing is uploaded.</p>
@@ -103,7 +116,7 @@ function toolHtml(page) {
 
 function stepsHtml(page) {
   const from = page.from === 'any' ? 'your images' : `your ${FORMAT_LABEL[page.from]} files`;
-  const to = FORMAT_LABEL[page.to];
+  const to = page.to === 'same' ? 'image' : FORMAT_LABEL[page.to];
   const lossyHint = {
     jpg: page.keepJpegOption ? 'Leave “Keep the original JPEG data” ticked to rename the file without re-compressing it. Untick it to re-save at a chosen quality.' : 'Set the quality and, if the images have transparent areas, the background colour.',
     webp: 'Set the quality; around 85% is a good start.',
@@ -122,7 +135,7 @@ function stepsHtml(page) {
   <h2 id="how">${esc(page.howTitle || `How to convert ${page.from === 'any' ? 'an image' : `${FORMAT_LABEL[page.from]} to ${to}`}`)}</h2>
   <ol class="steps">
     <li><strong>Add ${esc(from)}</strong>Drop them on the box above, click to choose them, or paste an image from the clipboard. You can add many at once.</li>
-    <li><strong>Check the settings</strong>${page.slug === '' ? 'Pick the output format. ' : ''}${esc(lossyHint)}</li>
+    <li><strong>Check the settings</strong>${page.settingsHint ? esc(page.settingsHint) : `${page.slug === '' ? 'Pick the output format. ' : ''}${esc(lossyHint)}`}</li>
     ${lastStep}
   </ol>
 </section>`;
@@ -200,11 +213,12 @@ function calloutHtml(root, logo) {
 function convertersBySource(root) {
   const groups = new Map();
   for (const c of converters) {
-    if (!groups.has(c.from)) groups.set(c.from, []);
-    groups.get(c.from).push(c);
+    const key = c.group || c.from;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(c);
   }
   const items = [...groups].map(([from, list]) => {
-    const label = from === 'any' ? 'Any image' : `From ${FORMAT_LABEL[from] || from.toUpperCase()}`;
+    const label = from === 'compress' ? 'Compress and resize' : from === 'any' ? 'Any image' : `From ${FORMAT_LABEL[from] || from.toUpperCase()}`;
     const links = list.map((c) => `<li><a href="${root}${pagePath(c.slug)}">${esc(c.slug ? linkLabel(c) : 'Any image to any format')}</a></li>`).join('');
     return `<div class="by-source"><h3>${esc(label)}</h3><ul>${links}</ul></div>`;
   });
@@ -418,6 +432,7 @@ async function main() {
     copyFile(join(ROOT, 'extension/lib/pdf.js'), join(DIST, 'lib/pdf.js')),
     copyFile(join(ROOT, 'extension/lib/gif.js'), join(DIST, 'lib/gif.js')),
     copyFile(join(ROOT, 'extension/lib/tiff-write.js'), join(DIST, 'lib/tiff-write.js')),
+    copyFile(join(ROOT, 'extension/lib/png-quant.js'), join(DIST, 'lib/png-quant.js')),
   ]);
   // HEIC decoder (LGPL, vendored unmodified; see site/vendor/libheif/README.md).
   await mkdir(join(DIST, 'vendor/libheif'), { recursive: true });

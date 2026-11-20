@@ -14,6 +14,13 @@ import { decodeTiff, tiffPageCount } from './tiff-client.js';
 const FALLBACK_DECODERS = { heic: decodeHeic, tiff: decodeTiff };
 const MAX_TIFF_PAGES = 500;
 
+// Formats that "Max file size" works for (quality search, palette PNG, then smaller dimensions).
+const TARGET_FORMATS = new Set(['jpg', 'webp', 'avif', 'png', 'same']);
+const SAME = { id: 'same', label: 'Same as original', lossy: true, opaque: false };
+const formatOf = (id) => FORMATS[id] || SAME;
+// Output format for "Same as original": the input's own format where the page can write it.
+const KIND_OF = { jpg: 'jpeg', png: 'png', webp: 'webp', avif: 'avif', tiff: 'tiff', gif: 'gif' };
+
 const tool = document.querySelector('[data-tool]');
 if (tool) init(tool);
 
@@ -41,6 +48,18 @@ function init(root) {
   const tiffCompression = $('#tiff-compression');
   const tiffCtl = $('#tiff-control');
   const formatNote = $('#format-note');
+  const resizeMode = $('#resize-mode');
+  const resizeW = $('#resize-width');
+  const resizeH = $('#resize-height');
+  const resizePct = $('#resize-percent');
+  const resizeDims = $('#resize-dims');
+  const resizePctWrap = $('#resize-pct');
+  const resizeCtl = $('#resize-control');
+  const targetOn = $('#target-on');
+  const targetKb = $('#target-kb');
+  const targetCtl = $('#target-control');
+  const pngColors = $('#png-colors');
+  const pngColorsCtl = $('#png-colors-control');
   const bar = $('#results-bar');
   const status = $('#status');
   const list = $('#results');
@@ -64,17 +83,33 @@ function init(root) {
     keepJpeg: !!keepJpeg?.checked && formatSel.value === 'jpg',
     dither: dither ? dither.checked : true,
     tiffCompression: tiffCompression?.value || 'lzw',
+    resize: resizeMode && resizeMode.value !== 'none' && formatSel.value !== 'ico'
+      ? { mode: resizeMode.value, width: Number(resizeW.value) || 0, height: Number(resizeH.value) || 0, percent: clampInt(resizePct.value, 1, 400, 100) }
+      : null,
+    targetBytes: targetOn?.checked && TARGET_FORMATS.has(formatSel.value) ? clampInt(targetKb.value, 1, 1e5, 100) * 1024 : 0,
+    pngColors: pngColors ? Number(pngColors.value) || 0 : 0,
   });
 
   function syncControls() {
-    const fmt = FORMATS[formatSel.value];
+    const fmt = formatOf(formatSel.value);
     const keeping = !!keepJpeg?.checked && fmt.id === 'jpg';
+    const palette = (fmt.id === 'png' || fmt.id === 'same') && Number(pngColors?.value) > 0;
+    if (resizeCtl) {
+      resizeCtl.hidden = fmt.id === 'ico' || keeping;
+      resizeDims.hidden = resizeMode.value !== 'fit' && resizeMode.value !== 'exact';
+      resizePctWrap.hidden = resizeMode.value !== 'percent';
+    }
+    if (targetCtl) {
+      targetCtl.hidden = !TARGET_FORMATS.has(fmt.id) || keeping;
+      targetKb.disabled = !targetOn.checked;
+    }
+    if (pngColorsCtl) pngColorsCtl.hidden = !(fmt.id === 'png' || fmt.id === 'same');
     if (keepJpegCtl) keepJpegCtl.hidden = fmt.id !== 'jpg';
     qualityCtl.hidden = !fmt.lossy || keeping;
     bgCtl.hidden = !fmt.opaque || keeping;
     pageSizeCtl.hidden = fmt.id !== 'pdf';
     icoCtl.hidden = fmt.id !== 'ico';
-    if (ditherCtl) ditherCtl.hidden = fmt.id !== 'gif';
+    if (ditherCtl) ditherCtl.hidden = fmt.id !== 'gif' && !palette;
     downloadPdf.hidden = fmt.id !== 'pdf';
     if (tiffCtl) tiffCtl.hidden = fmt.id !== 'tiff';
     if (downloadTiff) downloadTiff.hidden = fmt.id !== 'tiff';
@@ -90,6 +125,7 @@ function init(root) {
     const unsupported = [];
     for (const opt of formatSel.options) {
       const fmt = FORMATS[opt.value];
+      if (!fmt) continue; // Same as original
       if (!(await canEncode(fmt.mime))) {
         opt.disabled = true;
         opt.textContent = `${fmt.label} (not available in this browser)`;
@@ -98,14 +134,14 @@ function init(root) {
     }
     // The note matters on the general converter, or when this page's own format is unavailable;
     // elsewhere the disabled option's label already says so.
-    const wantedLabel = FORMATS[formatSel.value].label;
+    const wantedLabel = formatOf(formatSel.value).label;
     if (unsupported.length && (root.hasAttribute('data-general') || unsupported.includes(wantedLabel))) {
-      const wanted = FORMATS[formatSel.value];
+      const wanted = formatOf(formatSel.value);
       let msg = `This browser cannot create ${unsupported.join(' or ')} files from a web page, so ${unsupported.length > 1 ? 'those options are' : 'that option is'} switched off.`;
       if (unsupported.includes(wanted.label)) {
         const fallback = [...formatSel.options].find((o) => !o.disabled);
         if (fallback) formatSel.value = fallback.value;
-        msg += ` Output is set to ${FORMATS[formatSel.value].label} instead; a current version of Chrome, Edge or Firefox can create ${wanted.label}.`;
+        msg += ` Output is set to ${formatOf(formatSel.value).label} instead; a current version of Chrome, Edge or Firefox can create ${wanted.label}.`;
       }
       formatNote.textContent = msg;
       formatNote.hidden = false;
@@ -128,6 +164,10 @@ function init(root) {
   tiffCompression?.addEventListener('change', () => settingsChanged());
   bg.addEventListener('input', () => settingsChanged(300));
   svgSize?.addEventListener('change', () => settingsChanged());
+  resizeMode?.addEventListener('change', () => settingsChanged());
+  for (const input of [resizeW, resizeH, resizePct, targetKb]) input?.addEventListener('input', () => settingsChanged(500));
+  targetOn?.addEventListener('change', () => settingsChanged());
+  pngColors?.addEventListener('change', () => settingsChanged());
 
   // ---- adding files -------------------------------------------------------
   // A multi-page TIFF (scans, faxes) becomes one row per page, in page order.
@@ -212,10 +252,15 @@ function init(root) {
       updateBar();
       try {
         const decoders = item.page != null ? { ...FALLBACK_DECODERS, tiff: (b) => decodeTiff(b, item.page) } : FALLBACK_DECODERS;
-        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, { ...opts, preview: true, fallbackDecoders: decoders, preferFallback: item.page != null });
+        const format = opts.format === 'same' ? await sameFormat(item) : opts.format;
+        let r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, format, { ...opts, preview: true, fallbackDecoders: decoders, preferFallback: item.page != null });
+        // "Same as original" is for making files smaller: if re-encoding did not help, keep the file.
+        if (opts.format === 'same' && !r.resized && item.page == null && r.blob.size >= item.file.size && r.sourceKind === KIND_OF[format]) {
+          r = { ...r, blob: new Blob([item.file], { type: FORMATS[format].mime }), keptOriginal: true, targetMet: r.targetBytes ? item.file.size <= r.targetBytes : undefined };
+        }
         if (item.removed) continue;
         revoke(item);
-        item.result = { ...r, format: opts.format, url: URL.createObjectURL(r.blob), name: outputName(item.outName || item.file.name, opts.format) };
+        item.result = { ...r, format, url: URL.createObjectURL(r.blob), name: outputName(item.outName || item.file.name, format) };
         item.error = null;
         item.state = 'done';
       } catch (err) {
@@ -302,10 +347,17 @@ function init(root) {
       else thumb.src = (item.preview ||= URL.createObjectURL(item.file));
       const before = item.file.size, after = r.blob.size;
       const pct = Math.round(((after - before) / before) * 100);
+      const extra = [];
+      if (r.quality != null && r.targetBytes && !r.keptOriginal) extra.push(` · quality ${Math.round(r.quality * 100)}%`);
+      if (r.colors && !r.keptOriginal) extra.push(` · ${r.colors} colours`);
+      if (r.targetBytes && r.targetMet === false) {
+        extra.push(' · ', Object.assign(el('span', 'warn'), { textContent: `could not get under ${fmtBytes(r.targetBytes)}; this is the smallest version` }));
+      }
       meta.replaceChildren(
         `${kindLabel(r.sourceKind, item.file)} ${fmtBytes(before)} → ${FORMATS[r.format].label} ${fmtBytes(after)} `,
-        r.kept ? '(original JPEG data kept)' : Object.assign(el('span', pct < 0 ? 'smaller' : 'larger'), { textContent: `(${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)}%)` }),
-        ` · ${r.width} × ${r.height} px`,
+        r.kept ? '(original JPEG data kept)' : r.keptOriginal ? '(original kept: re-saving did not make it smaller)' : Object.assign(el('span', pct < 0 ? 'smaller' : 'larger'), { textContent: `(${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)}%)` }),
+        r.resized ? ` · ${r.sourceWidth} × ${r.sourceHeight} → ${r.width} × ${r.height} px` : ` · ${r.width} × ${r.height} px`,
+        ...extra,
       );
       dl.href = r.url;
       dl.download = r.name;
@@ -351,7 +403,8 @@ function init(root) {
       for (const item of done) {
         entries.push({ name: uniqueName(item.result.name, used), data: new Uint8Array(await item.result.blob.arrayBuffer()) });
       }
-      saveFile(makeZip(entries), `saveform-${settings().format}-images.zip`);
+      const f = settings().format;
+      saveFile(makeZip(entries), f === 'same' ? 'saveform-images.zip' : `saveform-${f}-images.zip`);
     } finally {
       updateBar();
     }
@@ -388,6 +441,15 @@ function init(root) {
 }
 
 // ---- helpers --------------------------------------------------------------
+async function sameFormat(item) {
+  const kind = sniffType(new Uint8Array(await item.file.slice(0, 512).arrayBuffer()));
+  if (kind === 'jpeg' || kind === 'heic') return 'jpg';
+  if (kind === 'webp' && (await canEncode('image/webp'))) return 'webp';
+  if (kind === 'avif') return (await canEncode('image/avif')) ? 'avif' : 'jpg';
+  if (kind === 'tiff') return 'tiff';
+  return 'png'; // PNG, GIF (first frame), SVG, BMP, ICO
+}
+
 function saveFile(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -88,8 +88,8 @@ test('/guides/ exists with its own title, description, canonical, one h1 and a c
   const convHrefs = await page.locator('.by-source a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
   assert.equal(convHrefs.length, converters.length);
   for (const c of converters) assert.ok(convHrefs.includes(c.slug ? `../${c.slug}/` : '../'), `links converter ${c.slug || 'index'}`);
-  const groups = new Set(converters.map((c) => c.from));
-  assert.equal(await page.locator('.by-source').count(), groups.size, 'one group per source format');
+  const groups = new Set(converters.map((c) => c.group || c.from)); // plus "Compress and resize"
+  assert.equal(await page.locator('.by-source').count(), groups.size, 'one group per source format, plus Compress and resize');
 
   assert.equal(await page.locator('nav a[aria-current="page"]').textContent(), 'Guides');
   assert.deepEqual(errors, [], 'no console errors (CSP, missing assets)');
