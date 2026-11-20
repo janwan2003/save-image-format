@@ -10,7 +10,7 @@ import { readFile, stat, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { crc32 } from 'node:zlib';
+import { crc32, gunzipSync } from 'node:zlib';
 import { chromium } from 'playwright-core';
 import { converters } from '../site/pages.mjs';
 import { guides } from '../site/guides.mjs';
@@ -710,7 +710,7 @@ async function meanDifference(page, a, b) {
 
 test('png-to-gif, jpg-to-gif and webp-to-gif build with their own title, h1, canonical, sitemap entry and GIF controls', async () => {
   const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
-  assert.equal([...sitemap.matchAll(/<loc>/g)].length, converters.length + guides.length + 2, 'sitemap lists every page (converters, guides, extension, privacy)');
+  assert.equal([...sitemap.matchAll(/<loc>/g)].length, converters.length + guides.length + 3, 'sitemap lists every page (converters, guides, extension, privacy, guides index)');
   for (const slug of GIF_PAGES) {
     const entry = converters.find((c) => c.slug === slug);
     assert.ok(entry, `${slug} is in site/pages.mjs`);
@@ -1025,10 +1025,132 @@ test('avif-to-webp converts an AVIF with transparency into a WebP that keeps the
   await page.close();
 });
 
+const TIFF_DIR = join(ROOT, 'tests/fixtures/tiff');
+// File names in a ZIP, from the central directory.
+function zipEntryNames(buf) {
+  const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  let p = buf.readUInt32LE(eocd + 16);
+  const names = [];
+  for (let i = 0; i < buf.readUInt16LE(eocd + 10); i++) {
+    const n = buf.readUInt16LE(p + 28), extra = buf.readUInt16LE(p + 30), comment = buf.readUInt16LE(p + 32);
+    names.push(buf.subarray(p + 46, p + 46 + n).toString('utf8'));
+    p += 46 + n + extra + comment;
+  }
+  return names;
+}
+const tiffManifest = JSON.parse(await readFile(join(TIFF_DIR, 'manifest.json'), 'utf8'));
+
+/** Every pixel of the n-th result thumbnail (PNG output) compared with ImageMagick's RGBA. */
+async function compareResult(page, index, expected, tolerance) {
+  return page.evaluate(async ({ index, expected, tolerance }) => {
+    const img = document.querySelectorAll('#results .thumb')[index];
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const got = ctx.getImageData(0, 0, c.width, c.height).data;
+    // The canvas keeps pixels premultiplied, so colour in semi-transparent pixels is only exact
+    // to about 255/alpha; fully transparent pixels have no colour at all. (tiff.test.mjs checks
+    // the decoder's own output exactly.)
+    let bad = 0, max = 0;
+    for (let i = 0; i < expected.length; i++) {
+      const a = expected[i | 3];
+      if (a === 0 && (i & 3) !== 3) continue;
+      const tol = (i & 3) === 3 || a === 255 ? tolerance : Math.max(tolerance, Math.ceil(255 / a));
+      const d = Math.abs(got[i] - expected[i]);
+      if (d > tol) { bad++; max = Math.max(max, d); }
+    }
+    return { width: c.width, height: c.height, bad, max };
+  }, { index, expected: [...gunzipSync(await readFile(join(TIFF_DIR, expected)))], tolerance });
+}
+
+test('tiff-to-png decodes JPEG-in-TIFF, LZW with alpha, tiles, CMYK, fax G4 and 16-bit TIFFs like ImageMagick', async () => {
+  const { page } = await openPage('/tiff-to-png/');
+  assert.equal(await page.locator('#format').inputValue(), 'png');
+  const names = ['jpeg-ycbcr', 'rgba8-lzw', 'gray8-tiled', 'cmyk8', 'bilevel-g4', 'rgb16-be-deflate', 'orient6'];
+  await page.setInputFiles('#file', names.map((n) => join(TIFF_DIR, `${n}.tif`)));
+  await waitForDone(page, names.length);
+  for (const [i, n] of names.entries()) {
+    const c = tiffManifest[n];
+    const r = await compareResult(page, i, c.expected, c.tolerance);
+    assert.deepEqual([r.width, r.height], [c.width, c.height], n);
+    assert.equal(r.bad, 0, `${n}: ${r.bad} channel values off by more than ${c.tolerance} (max ${r.max})`);
+  }
+  assert.match(await page.locator('#results .result-meta').first().textContent(), /^TIFF .* → PNG .*96 × 64 px/);
+  await page.close();
+});
+
+test('tiff-to-pdf splits a multi-page TIFF into rows and combines them with a fax page into one PDF', async () => {
+  const { page } = await openPage('/tiff-to-pdf/');
+  assert.equal(await page.locator('#format').inputValue(), 'pdf');
+  await page.setInputFiles('#file', [join(TIFF_DIR, 'multipage.tif'), join(TIFF_DIR, 'bilevel-g3.tif')]);
+  await waitForDone(page, 4);
+  const labels = await page.locator('#results .result-name').allTextContents();
+  assert.deepEqual(labels, ['multipage-page-1.pdf', 'multipage-page-2.pdf', 'multipage-page-3.pdf', 'bilevel-g3.pdf']);
+  assert.equal(await page.locator('#results .thumb[src]').count(), 4, 'every PDF row shows a preview of its page');
+  const { name, bytes } = await downloadBytes(page, '#download-pdf');
+  assert.equal(name, 'multipage-page-1-and-3-more.pdf');
+  const pages = inspectPdf(bytes);
+  assert.equal(pages.length, 4);
+  assert.deepEqual(jpegSize(pages[0].data), { width: 40, height: 30 });
+  assert.deepEqual(jpegSize(pages[3].data), { width: 96, height: 64 });
+  // Pages keep their own colours: decode each page's JPEG and read its centre.
+  const centres = await page.evaluate(async (jpegs) => Promise.all(jpegs.map(async (b) => {
+    const bmp = await createImageBitmap(new Blob([new Uint8Array(b)], { type: 'image/jpeg' }));
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const g = c.getContext('2d'); g.drawImage(bmp, 0, 0);
+    return [...g.getImageData(bmp.width >> 1, bmp.height >> 1, 1, 1).data.slice(0, 3)];
+  })), pages.slice(0, 3).map((p) => [...p.data]));
+  [[0xd0, 0x20, 0x20], [0x20, 0xa0, 0x40], [0x20, 0x40, 0xc0]].forEach((rgb, i) => assert.ok(near(centres[i], rgb, 12), `page ${i + 1}: ${centres[i]} ≈ ${rgb}`));
+  await page.close();
+});
+
+test('tiff-to-jpg: multi-page TIFF gives numbered JPGs in a ZIP; a broken TIFF shows an error row', async () => {
+  const { page } = await openPage('/tiff-to-jpg/');
+  await page.setInputFiles('#file', join(TIFF_DIR, 'multipage.tif'));
+  await waitForDone(page, 3);
+  const { name, bytes } = await downloadBytes(page, '#download-all');
+  assert.equal(name, 'saveform-jpg-images.zip');
+  const entries = zipEntryNames(bytes);
+  assert.deepEqual(entries, ['multipage-page-1.jpg', 'multipage-page-2.jpg', 'multipage-page-3.jpg']);
+  const broken = (await readFile(join(TIFF_DIR, 'pil-rgb-lzw-le.tif'))).subarray(0, 4000);
+  await page.setInputFiles('#file', { name: 'scan.tif', mimeType: 'image/tiff', buffer: broken });
+  await page.waitForSelector('#results li[data-state="error"]', { timeout: 15000 });
+  assert.match(await page.locator('#results li[data-state="error"]').textContent(), /truncated or damaged/);
+  await page.close();
+});
+
+test('a Display P3 tagged TIFF is converted to sRGB like Chromium does it; the general converter takes TIFF', async () => {
+  const { page } = await openPage('/');
+  await page.selectOption('#format', 'png');
+  await page.setInputFiles('#file', [join(TIFF_DIR, 'quadrants-untagged.tif'), join(TIFF_DIR, 'quadrants-p3.tif')]);
+  await waitForDone(page, 2);
+  const points = [[16, 12], [48, 12], [16, 36], [48, 36]];
+  const raw = [], tagged = [];
+  for (const [x, y] of points) {
+    raw.push((await pixelOfResult(page, 0, x, y)).slice(0, 3));
+    tagged.push((await pixelOfResult(page, 1, x, y)).slice(0, 3));
+  }
+  const expected = await page.evaluate((raw) => raw.map(([r, g, b]) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 1;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = `color(display-p3 ${r / 255} ${g / 255} ${b / 255})`;
+    ctx.fillRect(0, 0, 1, 1);
+    return [...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  }), raw);
+  expected.forEach((want, i) => {
+    assert.ok(want.some((v, k) => Math.abs(v - raw[i][k]) >= 8), `quadrant ${i}: test colour must differ between P3 and sRGB`);
+    assert.ok(want.every((v, k) => Math.abs(v - tagged[i][k]) <= 2), `quadrant ${i}: got ${tagged[i]}, Chromium says ${want} (untagged ${raw[i]})`);
+  });
+  await page.close();
+});
+
 test('every page loads with one h1, unique title/description, valid JSON-LD and working internal links', async () => {
   const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname.slice(BASE_PATH.length));
-  const expected = converters.length + guides.length + 2; // + extension, privacy
+  const expected = converters.length + guides.length + 3; // + extension, privacy, guides index
   assert.equal(urls.length, expected);
   for (const g of guides) assert.ok(urls.includes(`/${g.slug}/`), `sitemap lists guide ${g.slug}`);
   for (const c of converters) assert.ok(urls.includes(c.slug ? `/${c.slug}/` : '/'), `sitemap lists converter ${c.slug || 'index'}`);
@@ -1061,7 +1183,7 @@ test('every page loads with one h1, unique title/description, valid JSON-LD and 
       assert.equal(await page.locator('[data-tool]').count(), guide.tool ? 1 : 0, `${path} embeds the converter only when configured`);
     }
     const footerHrefs = await page.locator('footer a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-    for (const g of guides) assert.ok(footerHrefs.some((h) => h.endsWith(`${g.slug}/`)), `${path} footer links ${g.slug}`);
+    assert.ok(footerHrefs.some((h) => h.endsWith('guides/')), `${path} footer links the guides index`);
     // Every same-site link resolves to a file in dist/.
     for (const href of await page.locator('a[href]').evaluateAll((as) => as.map((a) => a.href))) {
       const u = new URL(href);

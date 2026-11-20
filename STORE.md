@@ -8,6 +8,11 @@
 | Chrome Web Store | `packages/saveform-0.4.2-chrome.zip` | 0.4.2 uploaded (2026-11-20, session 7) to draft item `iimmananoageikphanfidapckaochlmn`; publishing waits for the operator to fill the dashboard (`store/chrome-privacy.md`) | `python3 scripts/cws-upload.py` (`--publish`, `--status`) |
 | Edge Add-ons | same Chrome zip | needs a Partner Center account (operator) | dashboard upload |
 
+**Images** (`docs/store/`, rendered by `node scripts/store-assets.mjs`; `... popup` re-renders only screenshot 2):
+screenshot 1 `screenshot-1280x800.png` (right-click menu) first, screenshot 2 `screenshot-2-1280x800.png`
+(save-all popup: the real `extension/popup.html` with a stubbed `chrome` API and self-drawn sample images) second,
+promo tile `promo-440x280.png`. Upload both screenshots to every store (AMO currently has only the first).
+
 Build both zips with `node scripts/pack-extension.mjs`. The AMO listing text lives in `scripts/amo-submit.py`
 (it differs from the text below only in naming Firefox instead of Chrome and in leaving out AVIF).
 

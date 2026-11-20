@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Builds the static Saveform site into dist/. Plain Node 22, no dependencies.
 //   node scripts/build-site.mjs
-// Pages come from site/pages.mjs (converters), site/guides.mjs (articles) plus site/content/*.html
-// (privacy, extension, 404), all rendered through site/template.html.
+// Pages come from site/pages.mjs (converters), site/guides.mjs (articles), a generated /guides/
+// index, plus site/content/*.html (privacy, extension, 404), all rendered through site/template.html.
 // The conversion engine is copied from extension/lib so the site and the
 // extension run the exact same code.
 import { mkdir, readFile, readdir, writeFile, copyFile, rm } from 'node:fs/promises';
@@ -49,6 +49,10 @@ function jsonLd(obj) {
 // Link text for a converter page: "WebP to PNG", or the page's own label (e.g. "Favicon generator").
 const linkLabel = (p) => p.linkLabel || `${FORMAT_LABEL[p.from]} to ${FORMAT_LABEL[p.to]}`;
 
+// Guides shown in the footer of every page (the rest are one click away on /guides/).
+const FOOTER_GUIDES = ['how-to-save-webp-as-png', 'how-to-download-all-images-from-a-page', 'how-to-open-heic-files-on-windows'];
+const GUIDES_SLUG = 'guides';
+
 const pagePath = (slug) => (slug ? `${slug}/` : '');
 const pageUrl = (slug) => new URL(pagePath(slug), SITE_URL).href;
 
@@ -74,7 +78,7 @@ function toolHtml(page) {
       ${ICON_UPLOAD}
       <span class="drop-title">Drop ${esc(fromLabel)} here</span>
       <span class="drop-sub"><span class="linkish">or choose files</span> · or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
-      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif">
+      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff">
     </label>
     <div class="controls">
       <label class="control" for="format"><span>Convert to</span><select id="format">${opts}</select></label>
@@ -187,6 +191,41 @@ function calloutHtml(root, logo) {
 </aside>`;
 }
 
+// Converter links grouped by the format they read: "WebP: WebP to PNG · WebP to JPG …".
+function convertersBySource(root) {
+  const groups = new Map();
+  for (const c of converters) {
+    if (!groups.has(c.from)) groups.set(c.from, []);
+    groups.get(c.from).push(c);
+  }
+  const items = [...groups].map(([from, list]) => {
+    const label = from === 'any' ? 'Any image' : `From ${FORMAT_LABEL[from] || from.toUpperCase()}`;
+    const links = list.map((c) => `<li><a href="${root}${pagePath(c.slug)}">${esc(c.slug ? linkLabel(c) : 'Any image to any format')}</a></li>`).join('');
+    return `<div class="by-source"><h3>${esc(label)}</h3><ul>${links}</ul></div>`;
+  });
+  return `<div class="by-source-grid">\n  ${items.join('\n  ')}\n</div>`;
+}
+
+function guidesIndexMain(root, logo) {
+  const cards = guides.map((g) => `<li class="guide-card">
+    <h2><a href="${root}${g.slug}/">${esc(g.h1)}</a></h2>
+    <p>${esc(g.lede)}</p>
+  </li>`).join('\n  ');
+  return `<section class="hero">
+  <h1>Guides to saving and converting images</h1>
+  <p class="lede">Short, practical articles about the image formats browsers and phones hand you, and how to turn them into files your other software accepts. Each one explains what is going on and walks through several ways to deal with it, including ways that need no extension at all.</p>
+</section>
+<ul class="guide-cards" aria-label="Guides">
+  ${cards}
+</ul>
+<section class="section" aria-labelledby="by-source">
+  <h2 id="by-source">Converters by source format</h2>
+  <p class="muted">Every converter runs in your browser. Pick the format you have; the page converts it on your device.</p>
+  ${convertersBySource(root)}
+</section>
+${calloutHtml(root, logo)}`;
+}
+
 function converterMain(page, root, logo) {
   const explainer = page.explainer.map((p) => `<p>${p}</p>`).join('\n  ');
   return `<section class="hero">
@@ -251,7 +290,12 @@ async function main() {
       navConvert: navAttr('convert'),
       navExtension: navAttr('extension'),
       navPrivacy: navAttr('privacy'),
-      footerGuides: guides.map((g) => `<a href="${root}${g.slug}/">${esc(g.footer)}</a>`).join(' '),
+      navGuides: navAttr('guides'),
+      footerGuides: FOOTER_GUIDES.map((slug) => {
+        const g = guides.find((x) => x.slug === slug);
+        if (!g) throw new Error(`Unknown footer guide ${slug}`);
+        return `<a href="${root}${g.slug}/">${esc(g.footer)}</a>`;
+      }).join(' ') + ` <a href="${root}${GUIDES_SLUG}/">All guides →</a>`,
     });
   }
 
@@ -309,6 +353,26 @@ async function main() {
     }));
   }
 
+  // Guides index.
+  {
+    const root = '../';
+    const listLd = {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Saveform guides',
+      url: pageUrl(GUIDES_SLUG),
+      inLanguage: 'en',
+      hasPart: guides.map((g) => ({ '@type': 'Article', headline: g.h1, url: pageUrl(g.slug) })),
+    };
+    await emit(join(GUIDES_SLUG, 'index.html'), render({
+      slug: GUIDES_SLUG, root, nav: 'guides',
+      title: 'Guides: Saving and Converting WebP, AVIF, HEIC and Other Images | Saveform',
+      description: 'Practical guides to saving images from websites in the format you need, opening iPhone HEIC photos on Windows, and downloading every image on a page at once.',
+      head: jsonLd(listLd),
+      main: guidesIndexMain(root, logo),
+    }));
+  }
+
   // Static content pages.
   const contentVars = (root) => ({ root, repo: REPO_URL, updated: UPDATED, converterLinks: converterLinks(root, null) });
   await emit('privacy/index.html', render({
@@ -337,6 +401,9 @@ async function main() {
     copyFile(join(SITE, 'assets/app.js'), join(DIST, 'assets/app.js')),
     copyFile(join(SITE, 'assets/heic.js'), join(DIST, 'assets/heic.js')),
     copyFile(join(SITE, 'assets/heic-worker.js'), join(DIST, 'assets/heic-worker.js')),
+    copyFile(join(SITE, 'assets/tiff.js'), join(DIST, 'assets/tiff.js')),
+    copyFile(join(SITE, 'assets/tiff-worker.js'), join(DIST, 'assets/tiff-worker.js')),
+    copyFile(join(SITE, 'assets/tiff-client.js'), join(DIST, 'assets/tiff-client.js')),
     copyFile(join(SITE, 'assets/icc.js'), join(DIST, 'assets/icc.js')),
     copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
@@ -358,7 +425,7 @@ async function main() {
   }
 
   // Search engine files.
-  const indexable = [...converters.map((p) => p.slug), ...guides.map((g) => g.slug), 'extension', 'privacy'];
+  const indexable = [...converters.map((p) => p.slug), ...guides.map((g) => g.slug), GUIDES_SLUG, 'extension', 'privacy'];
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${indexable.map((s) => `  <url><loc>${pageUrl(s)}</loc><lastmod>${UPDATED}</lastmod></url>`).join('\n')}

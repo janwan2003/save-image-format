@@ -18,9 +18,9 @@ export const converters = [
     from: 'any',
     to: 'png',
     title: 'Image Converter: PNG, JPG, WebP, PDF, ICO – No Upload | Saveform',
-    description: 'Free image converter that runs in your browser. Turn WebP, AVIF, HEIC, PNG, JPG, GIF or SVG into PNG, JPG, WebP, AVIF, GIF, PDF or ICO. No upload, no sign-up, batch ZIP download.',
+    description: 'Free image converter that runs in your browser. Turn WebP, AVIF, HEIC, TIFF, PNG, JPG, GIF or SVG into PNG, JPG, WebP, AVIF, GIF, PDF or ICO. No upload, no sign-up, batch ZIP download.',
     h1: 'Convert images to PNG, JPG, WebP, PDF and more',
-    lede: 'Drop in any image your browser can open (WebP, AVIF, PNG, JPG, GIF, SVG, BMP, ICO) or an iPhone HEIC photo and save it in the format you need, or combine several into one PDF. Conversion runs on your device, so nothing is uploaded.',
+    lede: 'Drop in any image your browser can open (WebP, AVIF, PNG, JPG, GIF, SVG, BMP, ICO), a TIFF scan or an iPhone HEIC photo and save it in the format you need, or combine several into one PDF. Conversion runs on your device, so nothing is uploaded.',
     svgOption: true,
     explainerTitle: 'Which format should I pick?',
     explainer: [
@@ -33,7 +33,7 @@ export const converters = [
     faq: [
       { q: 'Is this converter free?', a: 'Yes. There is no sign-up, no watermark and no limit on how many files you convert. Very large images are limited only by your device’s memory.' },
       { q: 'How can it convert without uploading?', a: 'Modern browsers can decode images and save them again through the canvas API. This page uses exactly that, so your pictures never leave the browser tab.' },
-      { q: 'Which input formats work?', a: 'Anything your browser can display: WebP, AVIF, PNG, JPG/JPEG, GIF (first frame), SVG, BMP and ICO, plus HEIC/HEIF photos from iPhones, which the page decodes itself with a WebAssembly decoder because most browsers cannot.' },
+      { q: 'Which input formats work?', a: 'Anything your browser can display: WebP, AVIF, PNG, JPG/JPEG, GIF (first frame), SVG, BMP and ICO, plus HEIC/HEIF photos from iPhones and TIFF files (including multi-page scans and faxes), which the page decodes itself because most browsers cannot.' },
       { q: 'Is any information about my images kept?', a: 'No. There are no analytics, no cookies and no accounts. Converted images exist only in your browser until you download them or close the tab.' },
       { q: 'What is the Saveform extension?', a: 'A browser extension that adds Save as PNG, JPG, WebP or PDF to the right-click menu on any web image, using the same conversion code as this page.' },
     ],
@@ -232,6 +232,72 @@ export const converters = [
       { q: 'Is the GPS location removed?', a: 'Yes. Only the picture is converted. Location, camera model and other metadata from the HEIC file are not written into the WebP, which is usually what you want before publishing a photo.' },
       { q: 'Will the WebP be smaller than the HEIC?', a: 'Not necessarily. HEIC is also a highly efficient format, so the WebP may come out similar in size or larger. The point is that browsers can display WebP. Each row shows both sizes.' },
       { q: 'What happens to Live Photos and portrait shots?', a: 'You get the main still image. The short video of a Live Photo is a separate file, and depth information is not converted.' },
+    ],
+  },
+  {
+    slug: 'tiff-to-jpg',
+    from: 'tiff',
+    to: 'jpg',
+    title: 'TIFF to JPG Converter – Multi-Page, No Upload | Saveform',
+    description: 'Convert TIFF and TIF images to JPG in your browser. Handles scans, faxes and multi-page TIFF files, batch converts with ZIP download, and never uploads your files.',
+    h1: 'TIFF to JPG converter',
+    lede: 'Turn .tif and .tiff files from scanners, cameras and design software into JPG images that open everywhere and are small enough to email. Each page of a multi-page TIFF becomes its own JPG. Nothing is uploaded.',
+    explainerTitle: 'Why convert TIFF to JPG',
+    explainer: [
+      'TIFF (Tagged Image File Format) dates from 1986 and is still the usual output of scanners, fax software, print workflows and many photo archives. It stores images without loss, or with lossless compression, at high bit depths, which is exactly why TIFF files are so large: a single A4 colour scan at 300 dpi is easily 25 MB.',
+      'JPG trades a little invisible detail for files that are often ten or more times smaller, and every phone, browser, website and email client can show it. For sharing, uploading or attaching a scan, it is usually the better choice. Keep the TIFF as your master copy if you plan to edit or print the image again.',
+      'Chrome, Edge and Firefox cannot display TIFF, so this page reads the file with its own TIFF decoder, running in your browser tab. It understands the common variants: uncompressed, LZW, Deflate (ZIP), PackBits and JPEG compression, CCITT Group 3 and Group 4 fax images, 1 to 16 bits per channel, greyscale, RGB, CMYK and palette colour, tiles and strips. A multi-page TIFF is split into one row per page.',
+    ],
+    faq: [
+      { q: 'What happens to a multi-page TIFF?', a: 'Each page gets its own row and becomes its own JPG, named after the file with -page-1, -page-2 and so on. Download them one by one or together as a ZIP. To keep the pages in one document, choose PDF instead.' },
+      { q: 'What quality should I pick?', a: '85–92% keeps scans and photos visually identical to the TIFF at a fraction of the size. For black-and-white text scans, PNG is often both smaller and sharper than JPG.' },
+      { q: 'What about transparent areas?', a: 'JPG has no transparency, so transparent parts of the TIFF are filled with the background colour you choose (white by default).' },
+      { q: 'Are my files uploaded?', a: 'No. The TIFF is decoded and the JPG is encoded inside your browser tab. Scans of contracts, IDs or medical letters never leave your device.' },
+      { q: 'My TIFF does not convert. Why?', a: 'A few rare TIFF variants are not supported yet, for example old-style JPEG compression, JPEG 2000, LZMA or Zstandard compression and CIELab colour. The row tells you which one your file uses.' },
+    ],
+  },
+  {
+    slug: 'tiff-to-png',
+    from: 'tiff',
+    to: 'png',
+    title: 'TIFF to PNG Converter – Lossless, Free, In Browser | Saveform',
+    description: 'Convert TIFF and TIF files to lossless PNG in your browser. Keeps transparency, splits multi-page TIFFs, batch ZIP download, no upload and no sign-up.',
+    h1: 'TIFF to PNG converter',
+    lede: 'Convert .tif and .tiff images to PNG without losing a single pixel, for websites, documents and editors that do not take TIFF. Transparency is kept, multi-page files are split into pages, and everything stays on your device.',
+    explainerTitle: 'TIFF and PNG: both lossless, one opens everywhere',
+    explainer: [
+      'TIFF and PNG are both lossless, so converting one to the other keeps every pixel. The difference is support: browsers, content management systems, chat apps and most online forms accept PNG, while TIFF is mostly understood by scanners, print shops and professional image software.',
+      'PNG is also a good fit for scanned text, line drawings and screenshots: for black-and-white or few-colour images it is usually much smaller than an uncompressed TIFF. For colour photos, PNG files stay large; <a href="../tiff-to-jpg/">TIFF to JPG</a> makes them small enough to email.',
+      'Transparent and semi-transparent areas in the TIFF (an alpha channel, premultiplied or not) are kept in the PNG. Images with 16 bits per channel are reduced to 8 bits, which is what PNG viewers and browsers show anyway. Chrome, Edge and Firefox cannot open TIFF themselves, so this page decodes it with its own TIFF reader, running in your browser tab.',
+    ],
+    faq: [
+      { q: 'Is TIFF to PNG lossless?', a: 'Yes for normal 8-bit images: every pixel is kept. Images with 16 bits per channel are reduced to 8 bits per channel, which looks the same on screen.' },
+      { q: 'Does it keep transparency?', a: 'Yes. An alpha channel in the TIFF becomes the PNG’s transparency.' },
+      { q: 'Can it convert multi-page TIFF files?', a: 'Yes. Every page becomes a separate PNG, numbered in page order, and you can download them all as one ZIP.' },
+      { q: 'Are CMYK TIFFs supported?', a: 'Yes. CMYK images are converted to RGB with a simple formula. Colours can differ slightly from what a colour-managed print workflow shows, because print-specific colour profiles are not applied.' },
+      NO_UPLOAD,
+    ],
+  },
+  {
+    slug: 'tiff-to-pdf',
+    from: 'tiff',
+    to: 'pdf',
+    title: 'TIFF to PDF Converter – Multi-Page Scans and Faxes | Saveform',
+    description: 'Turn TIFF scans and multi-page fax files into one PDF in your browser. A4, US Letter or original page size, combine many TIFFs, no upload and no sign-up.',
+    h1: 'TIFF to PDF converter',
+    lede: 'Make one PDF from TIFF scans, faxes and multi-page TIFF files. Every page of every file becomes a PDF page in the order you choose, and the work happens in your browser, so the documents stay on your device.',
+    explainerTitle: 'Scans and faxes into one document',
+    explainer: [
+      'Scanners and fax software often save multi-page documents as a single TIFF file. Most people you send it to would rather get a PDF: it opens in every browser and on every phone, and it prints with the right page size.',
+      'Add one or more TIFF files and each page appears as its own row. Reorder rows with the ↑ and ↓ buttons, remove pages you do not need, then click <em>Download one PDF</em>. You can mix TIFF pages with JPG, PNG or HEIC images in the same PDF.',
+      '<strong>Same as image</strong> makes each PDF page the size of its scan; <strong>A4</strong> and <strong>US Letter</strong> fit each page inside a margin. At 100% quality pages are stored losslessly, which suits black-and-white text; below 100% they are stored as JPEG, which keeps colour scans much smaller. Chrome, Edge and Firefox cannot open TIFF themselves, so this page decodes it with its own TIFF reader, running in your browser tab.',
+    ],
+    faq: [
+      { q: 'How do I convert a multi-page TIFF to one PDF?', a: 'Add the TIFF file: every page appears as a row. Check the order and click Download one PDF. All pages end up in a single PDF.' },
+      { q: 'Will a fax TIFF work?', a: 'Yes. Black-and-white fax and document scans compressed with CCITT Group 3 or Group 4 are supported.' },
+      { q: 'Is the text in the PDF searchable?', a: 'No. The PDF contains images of the pages, just like the TIFF. Making the text searchable needs OCR, which this page does not do.' },
+      { q: 'Are my documents uploaded?', a: 'No. Decoding the TIFF and writing the PDF both happen inside your browser tab, so confidential scans never leave your device.' },
+      { q: 'How large will the PDF be?', a: 'At 100% quality, roughly the size of the uncompressed image data, compressed losslessly. Lowering the quality to 80–90% stores pages as JPEG and makes colour scans much smaller; each row shows the size.' },
     ],
   },
   {
@@ -790,4 +856,4 @@ export const converters = [
   },
 ];
 
-export const FORMAT_LABEL = { any: 'image', png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', svg: 'SVG', gif: 'GIF', bmp: 'BMP', ico: 'ICO', pdf: 'PDF', jfif: 'JFIF', heic: 'HEIC' };
+export const FORMAT_LABEL = { any: 'image', png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', svg: 'SVG', gif: 'GIF', bmp: 'BMP', ico: 'ICO', pdf: 'PDF', jfif: 'JFIF', heic: 'HEIC', tiff: 'TIFF' };

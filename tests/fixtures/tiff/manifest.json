@@ -1,0 +1,209 @@
+{
+ "rgb8-none": {
+  "file": "rgb8-none.tif",
+  "expected": "rgb8-none.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": "RGB 8-bit, uncompressed, strips"
+ },
+ "rgb8-lzw": {
+  "file": "rgb8-lzw.tif",
+  "expected": "rgb8-lzw.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "rgb8-lzw-big": {
+  "file": "rgb8-lzw-big.tif",
+  "expected": "rgb8-lzw-big.rgba.gz",
+  "width": 320,
+  "height": 200,
+  "tolerance": 0,
+  "page": 0,
+  "note": "one 192 KB strip: LZW table fills and resets"
+ },
+ "rgb8-deflate-pred": {
+  "file": "rgb8-deflate-pred.tif",
+  "expected": "rgb8-deflate-pred.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "rgb8-packbits": {
+  "file": "rgb8-packbits.tif",
+  "expected": "rgb8-packbits.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "rgba8-lzw": {
+  "file": "rgba8-lzw.tif",
+  "expected": "rgba8-lzw.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "rgba8-assoc": {
+  "file": "rgba8-assoc.tif",
+  "expected": "rgba8-assoc.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": "premultiplied (associated) alpha; pixels with alpha < 32 are skipped by the test"
+ },
+ "rgb16-be-deflate": {
+  "file": "rgb16-be-deflate.tif",
+  "expected": "rgb16-be-deflate.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 1,
+  "page": 0,
+  "note": ""
+ },
+ "gray8-tiled": {
+  "file": "gray8-tiled.tif",
+  "expected": "gray8-tiled.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": "tiles that overhang the right and bottom edge"
+ },
+ "palette4": {
+  "file": "palette4.tif",
+  "expected": "palette4.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 1,
+  "page": 0,
+  "note": ""
+ },
+ "cmyk8": {
+  "file": "cmyk8.tif",
+  "expected": "cmyk8.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 2,
+  "page": 0,
+  "note": ""
+ },
+ "rgb8-planar": {
+  "file": "rgb8-planar.tif",
+  "expected": "rgb8-planar.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "bilevel-g4": {
+  "file": "bilevel-g4.tif",
+  "expected": "bilevel-g4.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "bilevel-g3": {
+  "file": "bilevel-g3.tif",
+  "expected": "bilevel-g3.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "bilevel-none": {
+  "file": "bilevel-none.tif",
+  "expected": "bilevel-none.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "bigtiff": {
+  "file": "bigtiff.tif",
+  "expected": "bigtiff.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "orient6": {
+  "file": "orient6.tif",
+  "expected": "orient6.rgba.gz",
+  "width": 64,
+  "height": 96,
+  "tolerance": 0,
+  "page": 0,
+  "note": "Orientation 6: shown rotated 90\u00b0 clockwise"
+ },
+ "jpeg-ycbcr": {
+  "file": "jpeg-ycbcr.tif",
+  "expected": "jpeg-ycbcr.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 6,
+  "page": 0,
+  "note": "JPEG-in-TIFF (needs a browser)"
+ },
+ "multipage[0]": {
+  "file": "multipage.tif",
+  "expected": "multipage-p0.rgba.gz",
+  "width": 40,
+  "height": 30,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "multipage[1]": {
+  "file": "multipage.tif",
+  "expected": "multipage-p1.rgba.gz",
+  "width": 40,
+  "height": 30,
+  "tolerance": 0,
+  "page": 1,
+  "note": ""
+ },
+ "multipage[2]": {
+  "file": "multipage.tif",
+  "expected": "multipage-p2.rgba.gz",
+  "width": 40,
+  "height": 30,
+  "tolerance": 0,
+  "page": 2,
+  "note": ""
+ },
+ "pil-rgb-lzw-le": {
+  "file": "pil-rgb-lzw-le.tif",
+  "expected": "pil-rgb-lzw-le.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ },
+ "pil-gray-deflate": {
+  "file": "pil-gray-deflate.tif",
+  "expected": "pil-gray-deflate.rgba.gz",
+  "width": 96,
+  "height": 64,
+  "tolerance": 0,
+  "page": 0,
+  "note": ""
+ }
+}

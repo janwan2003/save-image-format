@@ -6,10 +6,12 @@ import { makePdf } from '../lib/pdf.js';
 import { baseNameFromUrl } from '../lib/filename.js';
 import { makeZip } from '../lib/zip.js';
 import { decodeHeic } from './heic.js';
+import { decodeTiff, tiffPageCount } from './tiff-client.js';
 
 // Formats the browser may not decode itself. HEIC (iPhone photos) goes to a WebAssembly
-// decoder that is only downloaded when the first HEIC file is added.
-const FALLBACK_DECODERS = { heic: decodeHeic };
+// decoder that is only downloaded when the first HEIC file is added; TIFF to our own decoder.
+const FALLBACK_DECODERS = { heic: decodeHeic, tiff: decodeTiff };
+const MAX_TIFF_PAGES = 500;
 
 const tool = document.querySelector('[data-tool]');
 if (tool) init(tool);
@@ -120,18 +122,35 @@ function init(root) {
   svgSize?.addEventListener('change', () => settingsChanged());
 
   // ---- adding files -------------------------------------------------------
+  // A multi-page TIFF (scans, faxes) becomes one row per page, in page order.
+  async function expand(file) {
+    if (sniffType(new Uint8Array(await file.slice(0, 8).arrayBuffer())) !== 'tiff') return [{ file, label: file.name }];
+    let pages = 1;
+    try { pages = Math.min(MAX_TIFF_PAGES, await tiffPageCount(file)); } catch { /* the conversion reports the error */ }
+    if (pages < 2) return [{ file, label: file.name }];
+    const stem = file.name.replace(/\.[^.]*$/, '') || 'image';
+    return Array.from({ length: pages }, (_, page) => ({ file, page, label: `${file.name} (page ${page + 1} of ${pages})`, outName: `${stem}-page-${page + 1}` }));
+  }
+
+  let adding = Promise.resolve();
   function addFiles(files) {
-    const added = [];
-    for (const file of files) {
-      if (!file || !file.size) continue;
-      const item = { id: nextId++, file, state: 'queued', result: null, error: null, row: null };
-      items.push(item);
-      item.row = makeRow(item);
-      list.append(item.row.li);
-      added.push(item);
-    }
-    added.forEach(enqueue);
-    updateBar();
+    files = files.filter((f) => f && f.size);
+    // Chained so that rows keep the order in which files were added.
+    adding = adding.then(async () => {
+      const added = [];
+      for (const file of files) {
+        for (const entry of await expand(file)) {
+          const item = { id: nextId++, ...entry, state: 'queued', result: null, error: null, row: null };
+          items.push(item);
+          item.row = makeRow(item);
+          list.append(item.row.li);
+          added.push(item);
+        }
+      }
+      added.forEach(enqueue);
+      updateBar();
+    });
+    return adding;
   }
 
   fileInput.addEventListener('change', () => {
@@ -184,10 +203,11 @@ function init(root) {
       renderRow(item);
       updateBar();
       try {
-        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, { ...opts, fallbackDecoders: FALLBACK_DECODERS });
+        const decoders = item.page != null ? { ...FALLBACK_DECODERS, tiff: (b) => decodeTiff(b, item.page) } : FALLBACK_DECODERS;
+        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, { ...opts, fallbackDecoders: decoders, preferFallback: item.page != null });
         if (item.removed) continue;
         revoke(item);
-        item.result = { ...r, format: opts.format, url: URL.createObjectURL(r.blob), name: outputName(item.file.name, opts.format) };
+        item.result = { ...r, format: opts.format, url: URL.createObjectURL(r.blob), name: outputName(item.outName || item.file.name, opts.format) };
         item.error = null;
         item.state = 'done';
       } catch (err) {
@@ -204,6 +224,7 @@ function init(root) {
 
   function revoke(item) {
     if (item.result?.url) URL.revokeObjectURL(item.result.url);
+    if (item.pdfThumb) { URL.revokeObjectURL(item.pdfThumb); item.pdfThumb = null; }
   }
 
   function forget(item) {
@@ -227,16 +248,16 @@ function init(root) {
     dl.textContent = 'Download';
     const up = el('button', 'btn-icon move');
     up.type = 'button'; up.textContent = '↑'; up.title = 'Move up';
-    up.setAttribute('aria-label', `Move ${item.file.name} up`);
+    up.setAttribute('aria-label', `Move ${item.label} up`);
     const down = el('button', 'btn-icon move');
     down.type = 'button'; down.textContent = '↓'; down.title = 'Move down';
-    down.setAttribute('aria-label', `Move ${item.file.name} down`);
+    down.setAttribute('aria-label', `Move ${item.label} down`);
     up.addEventListener('click', () => move(item, -1));
     down.addEventListener('click', () => move(item, 1));
     const remove = el('button', 'btn-icon');
     remove.type = 'button';
     remove.textContent = '×';
-    remove.setAttribute('aria-label', `Remove ${item.file.name}`);
+    remove.setAttribute('aria-label', `Remove ${item.label}`);
     remove.addEventListener('click', () => {
       forget(item);
       li.remove();
@@ -261,11 +282,15 @@ function init(root) {
     const { thumb, name, meta, dl, li } = item.row;
     li.dataset.state = item.state;
     const r = item.result;
-    name.textContent = r ? r.name : item.file.name;
-    name.title = item.file.name;
+    name.textContent = r ? r.name : item.label;
+    name.title = item.label;
     if (item.state === 'done' && r) {
-      // A PDF cannot be shown in an <img>, so its row previews the source image.
-      thumb.src = r.format === 'pdf' ? (item.preview ||= URL.createObjectURL(item.file)) : r.url;
+      // A PDF cannot be shown in an <img>, so its row previews the page's JPEG data, or else the
+      // source file (not for HEIC/TIFF, which most browsers cannot show).
+      if (r.format !== 'pdf') thumb.src = r.url;
+      else if (r.pdfPage?.filter === 'DCTDecode') thumb.src = (item.pdfThumb ||= URL.createObjectURL(new Blob([r.pdfPage.data], { type: 'image/jpeg' })));
+      else if (r.sourceKind === 'heic' || r.sourceKind === 'tiff') thumb.removeAttribute('src');
+      else thumb.src = (item.preview ||= URL.createObjectURL(item.file));
       const before = item.file.size, after = r.blob.size;
       const pct = Math.round(((after - before) / before) * 100);
       meta.replaceChildren(
@@ -384,7 +409,7 @@ function uniqueName(name, used) {
 
 function kindLabel(kind, file) {
   if (kind === 'jpeg' && /\.jfif$/i.test(file.name)) return 'JFIF';
-  const labels = { png: 'PNG', jpeg: 'JPG', gif: 'GIF', webp: 'WebP', avif: 'AVIF', svg: 'SVG', bmp: 'BMP', ico: 'ICO', heic: 'HEIC' };
+  const labels = { png: 'PNG', jpeg: 'JPG', gif: 'GIF', webp: 'WebP', avif: 'AVIF', svg: 'SVG', bmp: 'BMP', ico: 'ICO', heic: 'HEIC', tiff: 'TIFF' };
   if (labels[kind]) return labels[kind];
   const ext = file.name.split('.').pop();
   return ext && ext !== file.name ? ext.toUpperCase() : 'Image';

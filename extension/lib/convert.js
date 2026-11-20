@@ -37,6 +37,7 @@ export function sniffType(bytes) {
     if (brands.some((x) => x === 'avif' || x === 'avis')) return 'avif';
     if (brands.some((x) => ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'msf1'].includes(x))) return 'heic';
   }
+  if (at(0, 0x49, 0x49, 0x2a, 0x00) || at(0, 0x4d, 0x4d, 0x00, 0x2a) || at(0, 0x49, 0x49, 0x2b, 0x00) || at(0, 0x4d, 0x4d, 0x00, 0x2b)) return 'tiff';
   if (at(0, 0x42, 0x4d)) return 'bmp';
   if (at(0, 0x00, 0x00, 0x01, 0x00)) return 'ico';
   if (at(0, 0xff, 0x0a) || ascii(4, 4) === 'JXL ') return 'jxl';
@@ -80,9 +81,10 @@ function canvasToBlob(canvas, type, quality) {
  * Decode a Blob into something drawable. Returns { source, width, height, kind, close }.
  * SVG needs a DOM (an <img>), so in a service worker it throws 'needs-dom'.
  * `fallbackDecoders` maps a sniffed kind to an async (blob) => same shape, tried when the
- * browser cannot decode it natively (the site uses this for HEIC; the extension passes none).
+ * browser cannot decode it natively (the site uses this for HEIC and TIFF; the extension passes
+ * none). `preferFallback` skips the browser's own decoder (a TIFF page other than the first).
  */
-export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null } = {}) {
+export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null, preferFallback = false } = {}) {
   const head = new Uint8Array(await blob.slice(0, 512).arrayBuffer());
   const kind = sniffType(head) || (blob.type.includes('svg') ? 'svg' : null);
   if (kind === 'svg') {
@@ -106,6 +108,7 @@ export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null } =
       setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
   }
+  if (preferFallback && kind && fallbackDecoders?.[kind]) return fallbackDecoders[kind](blob);
   try {
     const bmp = await createImageBitmap(blob);
     return { source: bmp, width: bmp.width, height: bmp.height, kind, close: () => bmp.close && bmp.close() };

@@ -107,3 +107,20 @@ test('Firefox: heic-to-png applies the tile grid and rotation', { skip }, async 
   assert.deepEqual(r.size, [96, 128]);
   [[0, 255, 0], [255, 255, 0], [255, 0, 0], [0, 0, 255]].forEach((rgb, i) => assert.ok(near(r.quadrants[i], rgb), `quadrant ${i}: ${r.quadrants[i]}`));
 });
+
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+test('Firefox: tiff-to-png decodes LZW, JPEG-in-TIFF and fax G4 TIFFs in the worker', { skip }, async () => {
+  const lzw = await convert('tiff-to-png', path.join(ROOT, 'tests/fixtures/tiff/quadrants-untagged.tif'));
+  assert.equal(lzw.state, 'done', JSON.stringify(lzw));
+  assert.match(lzw.text, /TIFF .* → PNG/);
+  assert.deepEqual(lzw.size, [64, 48]);
+  ['#c87830', '#30b040', '#3070c8', '#b04090'].forEach((h, i) => assert.ok(near(lzw.quadrants[i], hex(h), 1), `quadrant ${i}: ${lzw.quadrants[i]} ≈ ${h}`));
+  assert.ok(requests.includes('/assets/tiff-worker.js'), 'decoder worker fetched from this site');
+  const jpeg = await convert('tiff-to-png', path.join(ROOT, 'tests/fixtures/tiff/jpeg-ycbcr.tif'));
+  assert.equal(jpeg.state, 'done', JSON.stringify(jpeg));
+  assert.deepEqual(jpeg.size, [96, 64]);
+  const fax = await convert('tiff-to-png', path.join(ROOT, 'tests/fixtures/tiff/bilevel-g4.tif'));
+  assert.equal(fax.state, 'done', JSON.stringify(fax));
+  assert.deepEqual(fax.size, [96, 64]);
+});
