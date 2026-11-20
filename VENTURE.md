@@ -158,4 +158,6 @@ The site's converter pages could later carry one unobtrusive ad slot.
 - 2026-11-20 builder (session 2): submitted the Firefox build to AMO (add-on 3135549, status nominated) after a new
   real-Firefox end-to-end test (6/6, Firefox 158); split packaging into Chrome and Firefox zips; CWS upload blocked by the
   disabled Chrome Web Store API (inbox); added 5 converter pages and 3 guides (sitemap 13 → 21 URLs). Evidence: `npm test`
-  34/34 locally, AMO API status call, web-ext lint 0 errors; CI and live checks below.
+  34/34 locally and in Actions run 44735974439 (Firefox 160 + Chromium; the 6 Firefox cases ran, 0 skipped); Pages run
+  44735974246; live: 8 new/changed URLs return 200, sitemap has 21 <loc>, /extension/ shows the "in review" badge;
+  AMO API status call (nominated); web-ext lint 0 errors.
