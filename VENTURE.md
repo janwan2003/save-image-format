@@ -173,7 +173,7 @@ does not use the new options; its `convert.js` now imports `png-quant.js` (exten
 "Guides" in the header nav. **Store screenshot 2** (`docs/store/screenshot-2-1280x800.png`, the real save-all popup with stubbed data,
 made by `scripts/store-assets.mjs`) is listed in `store/chrome-privacy.md` and `STORE.md` for the operator to upload.
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 43 converter pages (+7 compress/resize pages in session 10, +3 TIFF pages in session 8, +4 →TIFF pages in session 9), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
+**Website** (live, https://janwan2003.github.io/save-image-format/): 48 converter pages plus the index (counted from `converters` in site/pages.mjs, session 10; the older "36" was stale) (+7 compress/resize pages in session 10, +3 TIFF pages in session 8, +4 →TIFF pages in session 9), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
 our own GIF89a encoder `extension/lib/gif.js`: median-cut palette, optional Floyd–Steinberg dithering, 1-bit transparency, LZW; GIF
 is also on the index format menu, not in the extension menu) (index,
 webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
