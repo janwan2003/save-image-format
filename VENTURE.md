@@ -41,6 +41,10 @@ Demand (the incumbent's users and search volume):
 - HEIC (session 6): "heic to jpg" ≈246,000/mo, "convert heic to jpg" ≈60,500, "heic to jpg converter" ≈27,100, "heic to jpeg"
   ≈18,100 in Semrush's overview of heictojpg.com ([Semrush, updated 2025-06-12](https://sv.semrush.com/website/heictojpg.com/overview));
   third-party estimate, country not stated, ~17 months old. Bigger than the webp terms above, and the field is crowded with upload-based sites.
+- SVG (session 13): "png to svg" ≈540,500/mo in Semrush's overview of picsvg.com ([Semrush, updated 2026-02-12](https://tr.semrush.com/website/picsvg.com/overview);
+  read from a web-search summary, Turkish locale, so "540.500" was read as 540,500; third-party estimate, country not stated). Not re-checked
+  on the page itself. Competitors seen in that space: picsvg.com, vectorizer.ai (paid), svgtrace.com; several "PNG to SVG" sites only wrap the
+  bitmap in an SVG file (general knowledge, not measured this session).
 - Vendors are already writing articles to capture these searches, e.g. [MConverter blog](https://mconverter.eu/blog/why-save-image-as-type-removed).
 
 Competitors (Chrome Web Store, queried live with curl on 2026-11-20):
@@ -85,7 +89,7 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
 
 Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Format" is an existing listing, so not used).
 
-**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.3; 0.4.2 = 0.4.1 + WebP outputs above 16,383 px refused with a clear message instead of Chromium silently cropping them; 0.4.3 = PDF pages that are pure black and white stored losslessly at 1 bit, grey pages at 8-bit grey (shared `lib/pdf.js`), plus `lib/tiff-write.js` shipped because `convert.js` imports it; TIFF is not in the extension menu):
+**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.4 (= 0.4.3 behaviour; ships the shared `lib/trace.js` and the extended `png-quant.js` because `convert.js` imports them; SVG is not in the extension menu); 0.4.2 = 0.4.1 + WebP outputs above 16,383 px refused with a clear message instead of Chromium silently cropping them; 0.4.3 = PDF pages that are pure black and white stored losslessly at 1 bit, grey pages at 8-bit grey (shared `lib/pdf.js`), plus `lib/tiff-write.js` shipped because `convert.js` imports it; TIFF is not in the extension menu):
 - Right-click image → Save image as → PNG / JPG / WebP / PDF (AVIF only where the browser's canvas can
   write it; Chrome 159 cannot, so not shown there) / Copy as PNG. PDF (added in v0.2.0) = one page, page size
   set in settings (same as image by default, or A4 / US Letter), JPEG quality shared with JPG.
@@ -105,8 +109,8 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
   settings page (quality, Save dialog on/off, file name pattern, Downloads subfolder, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.3-chrome.zip` and
-  `packages/saveform-0.4.3-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.4-chrome.zip` and
+  `packages/saveform-0.4.4-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
   offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
@@ -115,12 +119,12 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   superseded unreviewed 0.1.0 file is now `disabled`). The first attempt got HTTP 429 (throttled ~45 min); the retry worked.
   `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
 - **Chrome Web Store: uploaded as a draft, waiting for the operator.** The API works since 2026-11-20 (session 4):
-  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.3 uploaded in session 9 (`--status`: crxVersion 0.4.3).
+  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.4 uploaded in session 13 (`--status`: crxVersion 0.4.4).
   `cws-upload.py --publish` returns 400 listing exactly what the dashboard still needs (contact email + verification,
   language, category, icon, screenshot, description, Privacy practices). Text and files for every field: `store/chrome-privacy.md` (inbox line filed).
 - **AMO v0.3.0 submitted 2026-11-20** (version id 6737975, file `unreviewed`; 0.2.0 file now `disabled`). The listing-text PATCH
   that follows was throttled (429, ~23 h); retry with `python3 scripts/amo-submit.py --listing`.
-- **AMO v0.4.0–0.4.3 NOT yet submitted** (0.4.3 is the one to submit; 0.4.0 never reached AMO): upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
+- **AMO v0.4.0–0.4.4 NOT yet submitted** (0.4.4 is the one to submit; 0.4.0 never reached AMO): upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
   (≈ 2026-11-21 12:25 UTC). Re-run `python3 scripts/amo-submit.py` (it adds the version and PATCHes the new listing text).
 - **v0.3.0 (session 4):** settings for a file name pattern (`{name}`, `{site}`, `{date}`, `{time}`, `{width}`, `{height}`;
   default `{name}`) and a folder inside Downloads (`buildFilename()` in `extension/lib/filename.js`; separators, `..` and
@@ -169,6 +173,23 @@ PNG→PNG, WebP→WebP, HEIC→JPG, others→PNG) and keep the input file untouc
 `resize`, `targetBytes`, `pngColors` in `convertBlob` (`outputSize()` exported). New pages (subagent content): /compress-image/, /compress-jpg/,
 /compress-png/, /resize-image/, /compress-image-to-100kb/, /-50kb/, /-20kb/, listed under "Compress and resize" on /guides/. The extension
 does not use the new options; its `convert.js` now imports `png-quant.js` (extension tests passed with it in CI; not repacked or uploaded).
+**SVG output = vector tracing (session 13):** every converter page offers "SVG (traced vector)", with **Colours** (Black and white
+/ 2 / 4 / 8 / 16 / 32) and **Detail** (High / Normal / Low). Own tracer `extension/lib/trace.js` (no dependencies): palette from "flat"
+pixels when ≥ 50% are flat (logos; anti-aliased edges ignored) else all pixels (photos), via `choosePalette` (new export in
+`png-quant.js`); entries within ~20 levels of a more common one merged (JPEG noise); despeckle (regions < max(4, n/40000) px at Normal);
+colours stacked largest-first as cumulative layers (no seams); contours along pixel edges → unit-edge midpoints; corners found first
+(±3 points, ≥ 60°), Douglas–Peucker split at corners + pruning, least-squares refit of each segment, short-chamfer restore, quadratic
+curves (corners ≥ 70° stay sharp); `fill-rule="evenodd"`. Black and white = Otsu threshold, one black path, transparent background.
+Traced with the longer side between 512 px (small images upscaled ≤ 8×; colours then picked from the unscaled pixels) and 2,000 px; the
+SVG declares the output size. Runs in a module Web Worker on the site (`site/assets/trace-worker.js` + `trace-client.js`; falls back to
+the page if the worker fails). Rows show "N colours, M shapes" (M = subpaths, inflated by stacking). Pages: /png-to-svg/, /jpg-to-svg/,
+/image-to-svg/ (sitemap 67 → 70). Measured (Node, `traceImage` direct, this machine): 256 px icons 7–20 ms at native size; a 2000×1125
+photo at 8 colours 0.5–3.2 s and 185 KB–4.4 MB of SVG; at 32 colours up to 7.6 s / 13.8 MB (busy forest photo) — which is why it runs in
+a worker. Accuracy: synthetic logo rendered back in Chromium differs in ≤ 1% of pixels (8/4/16/32 colours), no background showing
+between colours. Visual check on Firefox, Inkscape, LibreOffice Calc, Debian and htop icons from `/usr/share` and two JPG wallpapers.
+**Not verified (session 13):** SVGs opened in Inkscape/Illustrator/Figma or cutting-machine software (only Chromium and Firefox rendered
+them); Safari (module workers need Safari 15+); pixel art (upscaling rounds it, by design); the main-thread fallback path; SVG size
+limits in other tools for 10+ MB photo traces; "32 colours" on photos often yields 13–16 after merging (the row shows the real count).
 **Camera RAW input (session 12):** every converter page takes RAW files (CR2, CR3, NEF/NRW, ARW, DNG, RAF, ORF, RW2, PEF, SRW and
 other TIFF-shaped RAW by extension). `site/assets/raw.js` (own code) does **not** develop sensor data: it walks every `FF D8 FF` in the
 file, parses markers to the frame header, keeps baseline/progressive 8-bit frames (lossless SOF3 = sensor data, skipped), takes the one
@@ -398,14 +419,14 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
 ## Next steps
 
 1. **Operator:** fill the Chrome Web Store dashboard for draft item `iimmananoageikphanfidapckaochlmn` (every field's text and
-   file in `store/chrome-privacy.md`; draft holds 0.4.3 (session 9); inbox line 2026-11-20; `--publish` still returns 400 listing the fields, 2026-11-20 session 6). Then run `python3 scripts/cws-upload.py --publish`;
+   file in `store/chrome-privacy.md`; draft holds 0.4.4 (session 13); inbox line 2026-11-20; `--publish` still returns 400 listing the fields, 2026-11-20 session 6). Then run `python3 scripts/cws-upload.py --publish`;
    the reply lists anything still missing. Afterwards: CWS link on `site/content/extension.html` and in `calloutHtml()`.
-2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.3 and PATCHes the listing text; if the listing PATCH is
+2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.4 and PATCHes the listing text; if the listing PATCH is
    throttled again, `--listing` later). Check the review (`--status`); when approved, add the AMO link to the site and start AMO metrics.
 3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
    put effort into the page types that get impressions (compare the 4 HEIC URLs, added 2026-11-20, against the WebP ones). Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
 4. Store screenshot of the save-all popup: made in session 8 (`docs/store/screenshot-2-1280x800.png`), listed for the operator in
-   `store/chrome-privacy.md`. Still to do: add it to AMO (not yet supported by `amo-submit.py`) when 0.4.3 is submitted.
+   `store/chrome-privacy.md`. Still to do: add it to AMO (not yet supported by `amo-submit.py`) when 0.4.4 is submitted.
 4a. TIFF follow-ups (lossless fax PDF pages, thumbnail skip, TIFF output and the multi-page guide done in session 9): CCITT G4
    output for 1-bit TIFF pages (fax systems want it; LZW 1-bit is ~same size as G3 input only by luck), a DPI setting for TIFF/PDF output
    (print shops ask for 300 dpi; we write 72), speed up LZW decoding (24 MP noise: 4 s), an "open TIFF files on Windows/Mac" guide,
@@ -424,6 +445,11 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    matrices (only from a source whose licence allows it, or measured ourselves), so do not promise it. Option to keep the camera JPEG
    bytes unchanged (no re-encode) when the output is JPG with no resize. Test a CR3 shot in HDR PQ mode. PSD: "export each layer"
    as a ZIP (common request on PSD converters), /psd-to-webp/ and /psd-to-pdf/ if the two PSD pages get impressions.
+4a5. SVG follow-ups (session 13): watch GSC for /png-to-svg/, /jpg-to-svg/, /image-to-svg/ from December against the converters ("png to
+   svg" ≈540K/mo per one Semrush figure, the largest query family we target). Then: a before/after preview with zoom so users can judge
+   the trace before downloading; an "SVG for Cricut / cut file" page if the B/W mode gets impressions; "remove background shape" option
+   (drop the largest layer when it touches all four edges); a curve fitter with cubic Béziers (fewer nodes, smoother large circles; faint
+   faceting is visible at 4× zoom); /webp-to-svg/ and /logo-to-svg/; check output in Inkscape (`inkscape --export-type=png`) in tests.
 4b. Real-photo coverage: try an HDR iPhone photo (gain map) and a 48 MP HEIC (memory/time), e.g. from libheif's or Apple's public samples.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
@@ -438,6 +464,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-20 (session 13): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
+  CWS draft crxVersion 0.4.4 (`cws-upload.py --status`, after this session's upload); `gsc.py status`: sitemap pending, 0 errors/warnings,
+  no search analytics rows for 2026-10-23..2026-11-20.
 
 - 2026-11-20 (session 12): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
   CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: sitemap pending, 0 errors/warnings, no search analytics rows for
@@ -547,3 +577,12 @@ The site's converter pages could later carry one unobtrusive ad slot.
   skipped and 44782854370 (8fa9e1c) 199 pass / 0 fail / 1 skipped, Pages run 44782854425; live github.io: CR3+DNG+NEF (45 MB) → JPG in 4.6 s,
   3 PSD fixtures + 10 real psd-tools files → PNG, 0 console errors, requests only to github.io; IndexNow 67 URLs (200), sitemap resubmitted (204).
   Found by tests: RAW output named `x.NEF.jpg` (fixed via outName); Pentax preview ending at EOF was missed (fixed).
+- 2026-11-20 builder (session 13): SVG output by vector tracing (own `lib/trace.js`, no dependencies) on every converter page, in a module
+  Web Worker; /png-to-svg/, /jpg-to-svg/, /image-to-svg/ (sitemap 67 → 70); extension 0.4.4 (same behaviour, ships the shared libs) uploaded
+  to the CWS draft. Evidence: Actions run 44788727017 (c7bd16c) 210 pass / 0 fail / 1 skipped and 44790616041 (c12390b) 211 pass / 0 fail /
+  1 skipped (pngcheck not installed), Pages runs 44788727983 / 44790616103; local `npm test` 212 / 211 pass / 0 fail; new `tests/svg.test.mjs`
+  (11) + a Firefox worker test; live github.io: 2 PNG icons + a 3840×2160 JPG traced in 750 ms via trace-worker.js, 0 console errors,
+  requests only to github.io; IndexNow 70 URLs (200), sitemap resubmitted (204); web-ext lint 0 errors (same 3 Chrome-key warnings as
+  before). Found by tests and visual checks: corners rounded away (fixed: corners found before simplifying), JPEG noise → 130 specks
+  (fixed: merge near-twin palette entries), photos lost foliage colours (fixed: all-pixel palette for photos), 4-colour PNG traced as 6
+  after upscaling (fixed: palette from unscaled pixels), 7.6 s main-thread freeze on a busy photo (fixed: worker).
