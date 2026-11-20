@@ -14,6 +14,7 @@ import { crc32 } from 'node:zlib';
 import { chromium } from 'playwright-core';
 import { converters } from '../site/pages.mjs';
 import { guides } from '../site/guides.mjs';
+import { inspectPdf, inspectIco, popplerAvailable, renderFirstPage } from './pdf-inspect.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
@@ -332,6 +333,128 @@ test('svg-to-jpg renders on a solid background; gif-to-jpg writes a JPEG', async
   assert.equal(out.name, 'dot.jpg');
   assert.deepEqual([...out.bytes.subarray(0, 3)], [0xff, 0xd8, 0xff]);
   await gifPage.close();
+});
+
+test('jpg-to-pdf: one PDF per image, reorder, then Download one PDF with A4 pages', async () => {
+  const { page } = await openPage('/jpg-to-pdf/');
+  assert.equal(await page.locator('#format').inputValue(), 'pdf');
+  assert.equal(await page.locator('#page-size').inputValue(), 'a4');
+  assert.equal(await page.locator('#page-size-control').isVisible(), true);
+  assert.equal(await page.locator('#bg-control').isVisible(), true, 'background colour applies to PDF pages');
+  const wide = await makeFixture(page, 'image/jpeg', 300, 200);
+  const tall = await makeFixture(page, 'image/jpeg', 120, 160);
+  await page.setInputFiles('#file', [
+    { name: 'wide.jpg', mimeType: 'image/jpeg', buffer: wide },
+    { name: 'tall.jpg', mimeType: 'image/jpeg', buffer: tall },
+  ]);
+  await waitForDone(page, 2);
+  assert.match(await page.locator('#download-pdf').textContent(), /2 pages/);
+
+  const single = await downloadBytes(page, '#results li:first-child a.btn');
+  assert.equal(single.name, 'wide.pdf');
+  const [p1] = inspectPdf(single.bytes);
+  assert.deepEqual(p1.mediaBox, [0, 0, 841.89, 595.28], 'landscape image -> landscape A4');
+  assert.equal(p1.filter, 'DCTDecode');
+  assert.deepEqual(jpegSize(p1.data), { width: 300, height: 200 });
+
+  // Move the second image up, then combine: page order follows the list.
+  await page.click('#results li:nth-child(2) .move');
+  assert.equal(await page.locator('#results li:first-child .result-name').textContent(), 'tall.pdf');
+  const combined = await downloadBytes(page, '#download-pdf');
+  assert.equal(combined.name, 'tall-and-1-more.pdf');
+  const pages = inspectPdf(combined.bytes);
+  assert.deepEqual(pages.map((p) => [p.width, p.height]), [[120, 160], [300, 200]]);
+  assert.deepEqual(pages[0].mediaBox, [0, 0, 595.28, 841.89], 'portrait image -> portrait A4');
+
+  // Page size "Same as image": 1 px = 0.75 pt.
+  await page.selectOption('#page-size', 'fit');
+  await waitForDone(page, 2);
+  const fit = inspectPdf((await downloadBytes(page, '#download-pdf')).bytes);
+  assert.deepEqual(fit.map((p) => p.mediaBox), [[0, 0, 90, 120], [0, 0, 225, 150]]);
+
+  if (popplerAvailable()) {
+    // Independent renderer (poppler): the 120×160 image sits centred at natural size on a white A4 page.
+    // (The JPEG fixture's left half is black: JPEG cannot store the canvas's transparency.)
+    const r = renderFirstPage(combined.bytes);
+    assert.deepEqual([r.width, r.height], [794, 1123], 'A4 at 96 dpi');
+    const cx = Math.round(r.width / 2), cy = Math.round(r.height / 2);
+    const right = r.rgb(cx + 30, cy), left = r.rgb(cx - 30, cy), margin = r.rgb(cx - 80, cy);
+    assert.ok(right[2] > 180 && right[0] < 80, `blue half drawn right of centre, got ${right}`);
+    assert.ok(left.every((v) => v < 40), `black half drawn left of centre, got ${left}`);
+    assert.ok(margin.every((v) => v > 240), `page outside the image is white, got ${margin}`);
+  } else {
+    console.log('# pdftoppm not installed: PDF rendering check skipped');
+  }
+  await page.close();
+});
+
+test('png-to-pdf at 100% stores pixels losslessly (FlateDecode) with the chosen background', async () => {
+  const { page } = await openPage('/png-to-pdf/');
+  assert.equal(await page.locator('#page-size').inputValue(), 'fit');
+  await page.fill('#quality', '100');
+  await page.dispatchEvent('#quality', 'input');
+  assert.equal(await page.locator('#quality-out').textContent(), '100% (lossless)');
+  await page.fill('#bg', '#00ff00');
+  const png = await makeFixture(page, 'image/png', 10, 4);
+  await page.setInputFiles('#file', { name: 'shot.png', mimeType: 'image/png', buffer: png });
+  await waitForDone(page, 1);
+  const thumbOk = await page.evaluate(() => document.querySelector('#results .thumb').decode().then(() => true, () => false));
+  assert.equal(thumbOk, true, 'PDF row shows a preview of the source image');
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'shot.pdf');
+  const [p] = inspectPdf(bytes);
+  assert.equal(p.filter, 'FlateDecode');
+  const px = p.pixels();
+  assert.equal(px.length, 10 * 4 * 3);
+  assert.deepEqual([...px.subarray(0, 3)], [0, 255, 0], 'transparent pixel -> background colour, exactly');
+  assert.deepEqual([...px.subarray(9 * 3, 9 * 3 + 3)], [0x1e, 0x88, 0xe5], 'opaque pixel kept exactly');
+  await page.close();
+});
+
+test('png-to-ico writes a multi-size icon with embedded PNGs and transparency', async () => {
+  const { page } = await openPage('/png-to-ico/');
+  assert.equal(await page.locator('#format').inputValue(), 'ico');
+  assert.equal(await page.locator('#ico-control').isVisible(), true);
+  await page.uncheck('input[name="ico-size"][value="256"]');
+  await page.check('input[name="ico-size"][value="64"]');
+  const png = await makeFixture(page, 'image/png', 80, 40); // not square: centred on a square
+  await page.setInputFiles('#file', { name: 'logo.png', mimeType: 'image/png', buffer: png });
+  await waitForDone(page, 1);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'logo.ico');
+  const entries = inspectIco(bytes);
+  assert.deepEqual(entries.map((e) => e.size), [16, 32, 48, 64]);
+  for (const e of entries) {
+    assert.deepEqual(e.bytes.subarray(0, 8), PNG_MAGIC, `${e.size}px entry is a PNG`);
+    assert.equal(e.bytes.readUInt32BE(16), e.size);
+    assert.equal(e.bytes.readUInt32BE(20), e.size);
+  }
+  // The browser itself can decode the icon, with transparency (top rows are padding).
+  assert.equal((await pixelOfResult(page, 0, 40, 2))[3], 0, 'padding is transparent');
+  await page.close();
+});
+
+test('jfif-to-jpg keeps the JPEG bytes unchanged; unticking re-encodes', async () => {
+  const { page } = await openPage('/jfif-to-jpg/');
+  assert.equal(await page.locator('#keep-jpeg').isChecked(), true);
+  assert.equal(await page.locator('#quality-control').isVisible(), false, 'quality hidden while keeping data');
+  const jpeg = await makeFixture(page, 'image/jpeg', 50, 30);
+  await page.setInputFiles('#file', { name: 'Photo.jfif', mimeType: 'image/jpeg', buffer: jpeg });
+  await waitForDone(page, 1);
+  assert.match(await page.locator('#results .result-meta').first().textContent(), /JFIF .* → JPG .*original JPEG data kept.*50 × 30 px/);
+  const kept = await downloadBytes(page, '#results a.btn');
+  assert.equal(kept.name, 'Photo.jpg');
+  assert.ok(kept.bytes.equals(jpeg), 'identical bytes');
+
+  await page.uncheck('#keep-jpeg');
+  assert.equal(await page.locator('#quality-control').isVisible(), true);
+  await page.waitForFunction(() => /\(/.test(document.querySelector('#results .result-meta')?.textContent || '') && !/kept/.test(document.querySelector('#results .result-meta').textContent));
+  await waitForDone(page, 1);
+  const redone = await downloadBytes(page, '#results a.btn');
+  assert.equal(redone.name, 'Photo.jpg');
+  assert.ok(!redone.bytes.equals(jpeg), 're-encoded');
+  assert.deepEqual(jpegSize(redone.bytes), { width: 50, height: 30 });
+  await page.close();
 });
 
 test('guide pages with an embedded converter convert a pasted image', async () => {

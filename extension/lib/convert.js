@@ -1,13 +1,20 @@
 // Saveform conversion core. Runs in an MV3 service worker (OffscreenCanvas),
 // an extension page, a Firefox background page, or a normal web page.
 // No network access happens here: it takes bytes in and gives bytes out.
+import { makePdf, pageFromCanvas } from './pdf.js';
 
 export const FORMATS = {
   png: { id: 'png', mime: 'image/png', ext: 'png', label: 'PNG', lossy: false, opaque: false },
   jpg: { id: 'jpg', mime: 'image/jpeg', ext: 'jpg', label: 'JPG', lossy: true, opaque: true },
   webp: { id: 'webp', mime: 'image/webp', ext: 'webp', label: 'WebP', lossy: true, opaque: false },
   avif: { id: 'avif', mime: 'image/avif', ext: 'avif', label: 'AVIF', lossy: true, opaque: false },
+  // Containers: the canvas encodes JPEG/PNG and Saveform wraps the result itself.
+  pdf: { id: 'pdf', mime: 'application/pdf', ext: 'pdf', label: 'PDF', lossy: true, opaque: true, canvasMime: 'image/jpeg' },
+  ico: { id: 'ico', mime: 'image/x-icon', ext: 'ico', label: 'ICO', lossy: false, opaque: false, canvasMime: 'image/png' },
 };
+
+/** Icon sizes written into an ICO file (each as an embedded PNG). */
+export const ICO_SIZES = [16, 32, 48, 256];
 
 /** Identify an image from its first bytes. Returns a short name or null. */
 export function sniffType(bytes) {
@@ -34,6 +41,8 @@ export function sniffType(bytes) {
 /** True if this browser's canvas can encode the given MIME type. */
 const encodeCache = new Map();
 export async function canEncode(mime) {
+  const container = Object.values(FORMATS).find((f) => f.mime === mime && f.canvasMime);
+  if (container) return canEncode(container.canvasMime);
   if (encodeCache.has(mime)) return encodeCache.get(mime);
   let ok = false;
   try {
@@ -97,14 +106,15 @@ export async function decode(blob, { svgMinSize = 0 } = {}) {
 }
 
 /**
- * Convert a Blob to the target format id ('png' | 'jpg' | 'webp' | 'avif').
- * options: quality (0..1, lossy formats), background (CSS color for JPG), svgMinSize.
- * Returns { blob, width, height, sourceKind }.
+ * Convert a Blob to the target format id ('png' | 'jpg' | 'webp' | 'avif' | 'pdf' | 'ico').
+ * options: quality (0..1, lossy formats; PDF at 1 = lossless), background (CSS color for
+ * JPG/PDF), svgMinSize, pageSize ('fit' | 'a4' | 'letter', PDF), icoSizes (ICO).
+ * Returns { blob, width, height, sourceKind } and, for PDF, pdfPage (to combine pages later).
  */
 export async function convertBlob(input, formatId, options = {}) {
   const fmt = FORMATS[formatId];
   if (!fmt) throw new Error(`Unknown format ${formatId}`);
-  const quality = fmt.lossy ? clamp(options.quality ?? (formatId === 'jpg' ? 0.92 : 0.9), 0.01, 1) : undefined;
+  const quality = fmt.lossy ? clamp(options.quality ?? (formatId === 'jpg' || formatId === 'pdf' ? 0.92 : 0.9), 0.01, 1) : undefined;
   const img = await decode(input, options);
   try {
     const canvas = makeCanvas(img.width, img.height);
@@ -114,6 +124,15 @@ export async function convertBlob(input, formatId, options = {}) {
       ctx.fillRect(0, 0, img.width, img.height);
     }
     ctx.drawImage(img.source, 0, 0, img.width, img.height);
+    if (formatId === 'pdf') {
+      const pdfPage = await pageFromCanvas(canvas, ctx, quality, canvasToBlob);
+      const blob = makePdf([pdfPage], { pageSize: options.pageSize });
+      return { blob, width: img.width, height: img.height, sourceKind: img.kind, pdfPage };
+    }
+    if (formatId === 'ico') {
+      const blob = await makeIco(img, options.icoSizes || ICO_SIZES);
+      return { blob, width: img.width, height: img.height, sourceKind: img.kind };
+    }
     const blob = await canvasToBlob(canvas, fmt.mime, quality);
     if (!blob) throw new Error('The browser could not encode the image');
     if (blob.type !== fmt.mime) {
@@ -124,6 +143,45 @@ export async function convertBlob(input, formatId, options = {}) {
   } finally {
     img.close();
   }
+}
+
+/**
+ * ICO with one PNG-compressed entry per size (supported since Windows Vista and by all
+ * current browsers). Non-square images are centred on a transparent square.
+ */
+async function makeIco(img, sizes) {
+  const list = [...new Set(sizes.map((n) => Math.round(n)).filter((n) => n >= 1 && n <= 256))].sort((a, b) => a - b);
+  if (!list.length) throw new Error('Pick at least one icon size');
+  const pngs = [];
+  for (const size of list) {
+    const c = makeCanvas(size, size);
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    const s = size / Math.max(img.width, img.height);
+    const w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+    g.drawImage(img.source, Math.floor((size - w) / 2), Math.floor((size - h) / 2), w, h);
+    const png = await canvasToBlob(c, 'image/png');
+    if (!png) throw new Error('The browser could not encode the image');
+    pngs.push({ size, data: new Uint8Array(await png.arrayBuffer()) });
+  }
+  const head = new DataView(new ArrayBuffer(6 + 16 * pngs.length));
+  head.setUint16(0, 0, true); // reserved
+  head.setUint16(2, 1, true); // type 1 = icon
+  head.setUint16(4, pngs.length, true);
+  let offset = head.byteLength;
+  pngs.forEach((p, i) => {
+    const e = 6 + i * 16;
+    head.setUint8(e, p.size % 256); // 0 means 256
+    head.setUint8(e + 1, p.size % 256);
+    head.setUint8(e + 2, 0); // no palette
+    head.setUint8(e + 3, 0);
+    head.setUint16(e + 4, 1, true); // colour planes
+    head.setUint16(e + 6, 32, true); // bits per pixel
+    head.setUint32(e + 8, p.data.length, true);
+    head.setUint32(e + 12, offset, true);
+    offset += p.data.length;
+  });
+  return new Blob([head.buffer, ...pngs.map((p) => p.data)], { type: 'image/x-icon' });
 }
 
 function clamp(x, lo, hi) { return Math.min(hi, Math.max(lo, Number(x))); }

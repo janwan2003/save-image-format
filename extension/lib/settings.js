@@ -5,6 +5,7 @@ export const DEFAULTS = {
   jpgBackground: '#ffffff',
   askWhere: true,       // show the Save As dialog
   svgMinSize: 1024,     // upscale small SVGs so the PNG is usable
+  pdfPageSize: 'fit',   // 'fit' (page = image), 'a4' or 'letter'
 };
 
 export async function getSettings() {
@@ -17,6 +18,6 @@ export async function getSettings() {
 }
 
 export function optionsFor(formatId, s) {
-  const q = { jpg: s.jpgQuality, webp: s.webpQuality, avif: s.avifQuality }[formatId];
-  return { quality: q == null ? undefined : q / 100, background: s.jpgBackground, svgMinSize: s.svgMinSize };
+  const q = { jpg: s.jpgQuality, pdf: s.jpgQuality, webp: s.webpQuality, avif: s.avifQuality }[formatId];
+  return { quality: q == null ? undefined : q / 100, background: s.jpgBackground, svgMinSize: s.svgMinSize, pageSize: s.pdfPageSize };
 }

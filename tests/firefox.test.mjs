@@ -12,6 +12,7 @@ import { mkdtemp, mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promis
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { buildFirefoxDir } from '../scripts/pack-extension.mjs';
+import { inspectPdf } from './pdf-inspect.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const has = (bin) => { try { execFileSync('which', [bin], { stdio: 'ignore' }); return true; } catch { return false; } };
@@ -147,7 +148,7 @@ function magic(buf) {
 test('Firefox: background loads and builds the menu', { skip }, async () => {
   const r = await run(`const bg = await browser.runtime.getBackgroundPage(); return { ids: [...bg.saveform.menuIds], ua: navigator.userAgent };`);
   console.log('# ' + r.ua);
-  for (const id of ['saveform', 'save:png', 'save:jpg', 'save:webp', 'copy:png']) assert.ok(r.ids.includes(id), id);
+  for (const id of ['saveform', 'save:png', 'save:jpg', 'save:webp', 'save:pdf', 'copy:png']) assert.ok(r.ids.includes(id), id);
 });
 
 test('Firefox: same-site WebP -> PNG', { skip }, async () => {
@@ -167,6 +168,14 @@ test('Firefox: SVG renders on the event page (no offscreen API) -> PNG', { skip 
   assert.equal(res.ok, true, JSON.stringify(res));
   assert.ok(res.width >= 1024, `rendered width ${res.width}`);
   assert.equal(magic(await savedFile('logo.png')), 'png');
+});
+
+test('Firefox: same-site WebP -> PDF', { skip }, async () => {
+  const res = await click('save:pdf', `http://127.0.0.1:${pagePort}/same.webp`);
+  assert.equal(res.ok, true, JSON.stringify(res));
+  const pages = inspectPdf(await savedFile('same.pdf'));
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0].filter, 'DCTDecode');
 });
 
 test('Firefox: data: URL -> WebP', { skip }, async () => {

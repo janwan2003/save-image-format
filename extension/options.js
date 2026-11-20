@@ -15,7 +15,7 @@ for (const key of Object.keys(DEFAULTS)) {
   if (out) out.textContent = `${el.value}%`;
   el.addEventListener('input', () => { if (out) out.textContent = `${el.value}%`; });
   el.addEventListener('change', async () => {
-    const v = el.type === 'checkbox' ? el.checked : el.type === 'color' ? el.value : Number(el.value);
+    const v = el.type === 'checkbox' ? el.checked : (el.type === 'color' || el.tagName === 'SELECT') ? el.value : Number(el.value);
     await chrome.storage.sync.set({ [key]: v });
     flash('Saved');
   });

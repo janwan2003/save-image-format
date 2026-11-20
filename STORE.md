@@ -4,22 +4,22 @@
 
 | Store | Package | State | How |
 |---|---|---|---|
-| Firefox AMO | `packages/saveform-0.1.0-firefox.zip` | submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
-| Chrome Web Store | `packages/saveform-0.1.0-chrome.zip` | not uploaded: Chrome Web Store API disabled in the Google Cloud project (see OPERATOR-INBOX.md) | `python3 scripts/cws-upload.py` once enabled |
+| Firefox AMO | `packages/saveform-0.2.0-firefox.zip` | submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
+| Chrome Web Store | `packages/saveform-0.2.0-chrome.zip` | not uploaded: Chrome Web Store API disabled in the Google Cloud project (see OPERATOR-INBOX.md) | `python3 scripts/cws-upload.py` once enabled |
 | Edge Add-ons | same Chrome zip | needs a Partner Center account (operator) | dashboard upload |
 
 Build both zips with `node scripts/pack-extension.mjs`. The AMO listing text lives in `scripts/amo-submit.py`
 (it differs from the text below only in naming Firefox instead of Chrome and in leaving out AVIF).
 
-**Name:** Saveform: Save Image as PNG, JPG, WebP
+**Name:** Saveform: Save Image as PNG, JPG, WebP, PDF
 **Category:** Tools / Photos
 **Short description (≤132 chars):**
-Right-click any image and save it as PNG, JPG or WebP. Converted on your device. No tracking, no network calls, open source.
+Right-click any image and save it as PNG, JPG, WebP or PDF. Converted on your device. No tracking, no network calls, open source.
 
 **Long description:**
 
 Saveform adds "Save image as" to the right-click menu for images, with a submenu:
-PNG, JPG, WebP (and AVIF where the browser can write it), plus "Copy as PNG".
+PNG, JPG, WebP, PDF (and AVIF where the browser can write it), plus "Copy as PNG".
 
 Useful when "Save image as…" gives you a .webp or .avif file that your editor, slide deck,
 upload form or older system will not open.
@@ -28,9 +28,10 @@ upload form or older system will not open.
 • No analytics, no ads, no account, no remote code.
 • Asks for almost nothing: no access to the pages you browse. If a server blocks extensions
   from reading an image, Saveform asks for access to that one site, and you can revoke it.
-• Keeps transparency in PNG and WebP; fills it with white (or a colour you pick) for JPG.
+• Keeps transparency in PNG and WebP; fills it with white (or a colour you pick) for JPG and PDF.
+• PDF: one page, either the size of the image or A4 / US Letter with the image fitted.
 • Renders SVG images at a usable size (1024 px by default).
-• Choose JPG and WebP quality, and whether to see the Save dialog each time.
+• Choose JPG, PDF and WebP quality, and whether to see the Save dialog each time.
 • Open source (MIT): every file in the store package can be checked against the GitHub source.
 
 Website and free online converters: https://janwan2003.github.io/save-image-format/

@@ -1,7 +1,8 @@
 // Saveform converter page. Uses the same conversion engine as the extension
 // (lib/convert.js, copied from extension/lib at build time). Nothing here makes
 // a network request: files are read, converted and offered for download locally.
-import { FORMATS, canEncode, convertBlob } from '../lib/convert.js';
+import { FORMATS, canEncode, convertBlob, decode, sniffType } from '../lib/convert.js';
+import { makePdf } from '../lib/pdf.js';
 import { baseNameFromUrl } from '../lib/filename.js';
 import { makeZip } from './zip.js';
 
@@ -19,6 +20,13 @@ function init(root) {
   const bg = $('#bg');
   const bgCtl = $('#bg-control');
   const svgSize = $('#svg-size');
+  const pageSize = $('#page-size');
+  const pageSizeCtl = $('#page-size-control');
+  const icoCtl = $('#ico-control');
+  const icoBoxes = [...root.querySelectorAll('input[name="ico-size"]')];
+  const keepJpeg = $('#keep-jpeg');
+  const keepJpegCtl = $('#keep-jpeg-control');
+  const downloadPdf = $('#download-pdf');
   const formatNote = $('#format-note');
   const bar = $('#results-bar');
   const status = $('#status');
@@ -38,13 +46,26 @@ function init(root) {
     quality: Number(quality.value) / 100,
     background: bg.value,
     svgMinSize: svgSize ? clampInt(svgSize.value, 16, 8192, 1024) : 0,
+    pageSize: pageSize.value,
+    icoSizes: icoBoxes.filter((b) => b.checked).map((b) => Number(b.value)),
+    keepJpeg: !!keepJpeg?.checked && formatSel.value === 'jpg',
   });
 
   function syncControls() {
     const fmt = FORMATS[formatSel.value];
-    qualityCtl.hidden = !fmt.lossy;
-    bgCtl.hidden = !fmt.opaque;
-    qualityOut.value = `${quality.value}%`;
+    const keeping = !!keepJpeg?.checked && fmt.id === 'jpg';
+    if (keepJpegCtl) keepJpegCtl.hidden = fmt.id !== 'jpg';
+    qualityCtl.hidden = !fmt.lossy || keeping;
+    bgCtl.hidden = !fmt.opaque || keeping;
+    pageSizeCtl.hidden = fmt.id !== 'pdf';
+    icoCtl.hidden = fmt.id !== 'ico';
+    downloadPdf.hidden = fmt.id !== 'pdf';
+    root.dataset.format = fmt.id;
+    showQuality();
+  }
+
+  function showQuality() {
+    qualityOut.value = formatSel.value === 'pdf' && quality.value === '100' ? '100% (lossless)' : `${quality.value}%`;
   }
 
   async function checkEncoders() {
@@ -57,7 +78,10 @@ function init(root) {
         unsupported.push(fmt.label);
       }
     }
-    if (unsupported.length) {
+    // The note matters on the general converter, or when this page's own format is unavailable;
+    // elsewhere the disabled option's label already says so.
+    const wantedLabel = FORMATS[formatSel.value].label;
+    if (unsupported.length && (root.hasAttribute('data-general') || unsupported.includes(wantedLabel))) {
       const wanted = FORMATS[formatSel.value];
       let msg = `This browser cannot create ${unsupported.join(' or ')} files from a web page, so ${unsupported.length > 1 ? 'those options are' : 'that option is'} switched off.`;
       if (unsupported.includes(wanted.label)) {
@@ -78,7 +102,10 @@ function init(root) {
     debounce = setTimeout(() => items.forEach(enqueue), delay);
   }
   formatSel.addEventListener('change', () => settingsChanged());
-  quality.addEventListener('input', () => { qualityOut.value = `${quality.value}%`; settingsChanged(300); });
+  quality.addEventListener('input', () => { showQuality(); settingsChanged(300); });
+  pageSize.addEventListener('change', () => settingsChanged());
+  icoBoxes.forEach((b) => b.addEventListener('change', () => settingsChanged(300)));
+  keepJpeg?.addEventListener('change', () => settingsChanged());
   bg.addEventListener('input', () => settingsChanged(300));
   svgSize?.addEventListener('change', () => settingsChanged());
 
@@ -147,7 +174,7 @@ function init(root) {
       renderRow(item);
       updateBar();
       try {
-        const r = await convertBlob(item.file, opts.format, opts);
+        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, opts);
         if (item.removed) continue;
         revoke(item);
         item.result = { ...r, format: opts.format, url: URL.createObjectURL(r.blob), name: outputName(item.file.name, opts.format) };
@@ -169,6 +196,12 @@ function init(root) {
     if (item.result?.url) URL.revokeObjectURL(item.result.url);
   }
 
+  function forget(item) {
+    item.removed = true;
+    revoke(item);
+    if (item.preview) URL.revokeObjectURL(item.preview);
+  }
+
   // ---- result rows --------------------------------------------------------
   function makeRow(item) {
     const li = el('li', 'result');
@@ -182,20 +215,36 @@ function init(root) {
     const actions = el('div', 'result-actions');
     const dl = el('a', 'btn');
     dl.textContent = 'Download';
+    const up = el('button', 'btn-icon move');
+    up.type = 'button'; up.textContent = '↑'; up.title = 'Move up';
+    up.setAttribute('aria-label', `Move ${item.file.name} up`);
+    const down = el('button', 'btn-icon move');
+    down.type = 'button'; down.textContent = '↓'; down.title = 'Move down';
+    down.setAttribute('aria-label', `Move ${item.file.name} down`);
+    up.addEventListener('click', () => move(item, -1));
+    down.addEventListener('click', () => move(item, 1));
     const remove = el('button', 'btn-icon');
     remove.type = 'button';
     remove.textContent = '×';
     remove.setAttribute('aria-label', `Remove ${item.file.name}`);
     remove.addEventListener('click', () => {
-      item.removed = true;
-      revoke(item);
+      forget(item);
       li.remove();
       items.splice(items.indexOf(item), 1);
       updateBar();
     });
-    actions.append(dl, remove);
+    actions.append(dl, up, down, remove);
     li.append(thumb, info, actions);
     return { li, thumb, name, meta, dl };
+  }
+
+  // Page order for "Download one PDF" is the list order.
+  function move(item, delta) {
+    const i = items.indexOf(item), j = i + delta;
+    if (i < 0 || j < 0 || j >= items.length) return;
+    [items[i], items[j]] = [items[j], items[i]];
+    list.replaceChildren(...items.map((it) => it.row.li));
+    item.row.li.querySelector(delta < 0 ? '.move' : '.move + .move')?.focus();
   }
 
   function renderRow(item) {
@@ -205,12 +254,13 @@ function init(root) {
     name.textContent = r ? r.name : item.file.name;
     name.title = item.file.name;
     if (item.state === 'done' && r) {
-      thumb.src = r.url;
+      // A PDF cannot be shown in an <img>, so its row previews the source image.
+      thumb.src = r.format === 'pdf' ? (item.preview ||= URL.createObjectURL(item.file)) : r.url;
       const before = item.file.size, after = r.blob.size;
       const pct = Math.round(((after - before) / before) * 100);
       meta.replaceChildren(
         `${kindLabel(r.sourceKind, item.file)} ${fmtBytes(before)} → ${FORMATS[r.format].label} ${fmtBytes(after)} `,
-        Object.assign(el('span', pct < 0 ? 'smaller' : 'larger'), { textContent: `(${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)}%)` }),
+        r.kept ? '(original JPEG data kept)' : Object.assign(el('span', pct < 0 ? 'smaller' : 'larger'), { textContent: `(${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)}%)` }),
         ` · ${r.width} × ${r.height} px`,
       );
       dl.href = r.url;
@@ -235,6 +285,8 @@ function init(root) {
     const failed = items.filter((i) => i.state === 'error').length;
     const busy = items.length - done - failed;
     downloadAll.disabled = done === 0 || busy > 0;
+    downloadPdf.disabled = done === 0 || busy > 0;
+    downloadPdf.textContent = done > 1 ? `Download one PDF (${done} pages)` : 'Download one PDF';
     let text = `${done} of ${items.length} image${items.length === 1 ? '' : 's'} converted`;
     if (failed) text += `, ${failed} failed`;
     if (busy) text += ' (working…)';
@@ -251,22 +303,22 @@ function init(root) {
       for (const item of done) {
         entries.push({ name: uniqueName(item.result.name, used), data: new Uint8Array(await item.result.blob.arrayBuffer()) });
       }
-      const zip = makeZip(entries);
-      const url = URL.createObjectURL(zip);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `saveform-${settings().format}-images.zip`;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      saveFile(makeZip(entries), `saveform-${settings().format}-images.zip`);
     } finally {
       updateBar();
     }
   });
 
+  downloadPdf.addEventListener('click', () => {
+    const pages = items.filter((i) => i.state === 'done' && i.result?.pdfPage);
+    if (!pages.length) return;
+    const pdf = makePdf(pages.map((i) => i.result.pdfPage), { pageSize: settings().pageSize });
+    const name = pages.length === 1 ? pages[0].result.name : `${pages[0].result.name.replace(/\.pdf$/, '')}-and-${pages.length - 1}-more.pdf`;
+    saveFile(pdf, name);
+  });
+
   clearBtn.addEventListener('click', () => {
-    for (const item of items) { item.removed = true; revoke(item); }
+    for (const item of items) forget(item);
     items.length = 0;
     queue.length = 0;
     list.replaceChildren();
@@ -279,6 +331,27 @@ function init(root) {
 }
 
 // ---- helpers --------------------------------------------------------------
+function saveFile(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// JFIF and .jpeg files are already JPEG: keep the bytes (and quality) and only rename.
+// Other inputs are converted normally.
+async function keepJpegBytes(file) {
+  const kind = sniffType(new Uint8Array(await file.slice(0, 512).arrayBuffer()));
+  if (kind !== 'jpeg') return convertBlob(file, 'jpg', {});
+  const img = await decode(file);
+  img.close();
+  return { blob: new Blob([file], { type: 'image/jpeg' }), width: img.width, height: img.height, sourceKind: 'jpeg', kept: true };
+}
+
 function el(tag, cls) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -300,6 +373,7 @@ function uniqueName(name, used) {
 }
 
 function kindLabel(kind, file) {
+  if (kind === 'jpeg' && /\.jfif$/i.test(file.name)) return 'JFIF';
   const labels = { png: 'PNG', jpeg: 'JPG', gif: 'GIF', webp: 'WebP', avif: 'AVIF', svg: 'SVG', bmp: 'BMP', ico: 'ICO' };
   if (labels[kind]) return labels[kind];
   const ext = file.name.split('.').pop();

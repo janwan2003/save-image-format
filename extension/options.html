@@ -15,10 +15,11 @@
   <label><input type="checkbox" id="askWhere"> Ask where to save each file (shows the Save dialog)</label>
 
   <h2>Quality</h2>
-  <label>JPG <input type="range" id="jpgQuality" min="10" max="100"> <output for="jpgQuality"></output></label>
+  <label>JPG and PDF <input type="range" id="jpgQuality" min="10" max="100"> <output for="jpgQuality"></output></label>
   <label>WebP <input type="range" id="webpQuality" min="10" max="100"> <output for="webpQuality"></output></label>
   <label id="avifRow">AVIF <input type="range" id="avifQuality" min="10" max="100"> <output for="avifQuality"></output></label>
-  <label>JPG background for transparent areas <input type="color" id="jpgBackground"></label>
+  <label>JPG and PDF background for transparent areas <input type="color" id="jpgBackground"></label>
+  <label>PDF page size <select id="pdfPageSize"><option value="fit">Same as the image</option><option value="a4">A4</option><option value="letter">US Letter</option></select></label>
   <label>Render SVG images at least <input type="number" id="svgMinSize" min="0" max="8192" step="64" style="width:6em"> px on the long side</label>
 
   <h2>Site access</h2>

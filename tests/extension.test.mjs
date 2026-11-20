@@ -10,6 +10,7 @@ import { mkdtemp, cp, readFile, writeFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
+import { inspectPdf } from './pdf-inspect.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 let server, pagePort, cdnPort, context, sw, page, tmp, downloadsDir;
@@ -140,14 +141,14 @@ async function fileOf(res) {
   return readFile(item.filename);
 }
 
-test('menu is registered with PNG, JPG, WebP and Copy', async () => {
+test('menu is registered with PNG, JPG, WebP, PDF and Copy', async () => {
   const r = await sw.evaluate(async () => {
     const { canEncode, menuIds } = globalThis.saveform;
     return { avif: await canEncode('image/avif'), webp: await canEncode('image/webp'), menuIds: [...menuIds] };
   });
   console.log('# encoder support in this Chromium:', JSON.stringify(r));
   assert.equal(r.webp, true);
-  for (const id of ['saveform', 'save:png', 'save:jpg', 'save:webp', 'copy:png']) assert.ok(r.menuIds.includes(id), id);
+  for (const id of ['saveform', 'save:png', 'save:jpg', 'save:webp', 'save:pdf', 'copy:png']) assert.ok(r.menuIds.includes(id), id);
   assert.equal(r.menuIds.includes('save:avif'), r.avif, 'AVIF entry shown only when the browser can encode AVIF');
 });
 
@@ -180,6 +181,24 @@ test('SVG -> PNG renders via the offscreen document and is upscaled', async () =
   assert.equal(magic(buf), 'png');
   const info = await inspect(buf);
   assert.deepEqual([info.w, info.h], [1024, 512]);
+});
+
+test('same-site WebP -> PDF: one page the size of the image (default setting)', async () => {
+  const res = await click('save:pdf', `http://127.0.0.1:${pagePort}/same.webp`);
+  assert.equal(res.ok, true, JSON.stringify(res));
+  assert.equal(res.filename, 'same.pdf');
+  assert.equal(res.type, 'application/pdf');
+  const pages = inspectPdf(await fileOf(res));
+  assert.equal(pages.length, 1);
+  assert.deepEqual(pages[0].mediaBox, [0, 0, 48, 36], '64×48 px at 96 dpi = 48×36 pt');
+  assert.equal(pages[0].filter, 'DCTDecode');
+});
+
+test('SVG -> PDF goes through the offscreen document too', async () => {
+  const res = await click('save:pdf', `http://localhost:${cdnPort}/cors/logo.svg`);
+  assert.equal(res.ok, true, JSON.stringify(res));
+  const [p] = inspectPdf(await fileOf(res));
+  assert.deepEqual([p.width, p.height], [1024, 512]);
 });
 
 test('data: URL image -> WebP', async () => {

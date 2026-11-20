@@ -15,21 +15,22 @@ API = "https://addons.mozilla.org/api/v5"
 ADDON_ID = "saveform@save-image-format"
 SITE = "https://janwan2003.github.io/save-image-format/"
 
-SUMMARY = ("Right-click any image and save it as PNG, JPG or WebP, or copy it as PNG. "
+SUMMARY = ("Right-click any image and save it as PNG, JPG, WebP or PDF, or copy it as PNG. "
            "Converted on your device. No tracking, no network calls, open source.")
-DESCRIPTION = """Saveform adds "Save image as" to the right-click menu for images, with a submenu: PNG, JPG, WebP, and "Copy as PNG".
+DESCRIPTION = """Saveform adds "Save image as" to the right-click menu for images, with a submenu: PNG, JPG, WebP, PDF, and "Copy as PNG".
 
 Useful when "Save Image As…" gives you a .webp or .avif file that your editor, slide deck, upload form or older system will not open.
 
 • Converts on your device. The image is never uploaded anywhere.
 • No analytics, no ads, no account, no remote code.
 • Asks for almost nothing: no access to the pages you browse. If a server blocks add-ons from reading an image, Saveform asks for access to that one site, and you can revoke it.
-• Keeps transparency in PNG and WebP; fills it with white (or a colour you pick) for JPG.
+• Keeps transparency in PNG and WebP; fills it with white (or a colour you pick) for JPG and PDF.
+• PDF: one page, either the size of the image or A4 / US Letter with the image fitted.
 • Renders SVG images at a usable size (1024 px by default).
-• Choose JPG and WebP quality, and whether to see the Save dialog each time.
+• Choose JPG, PDF and WebP quality, and whether to see the Save dialog each time.
 • Open source (MIT): every file in the package can be checked against the GitHub source.
 
-Free online converters (WebP to PNG, AVIF to JPG and more, also in your browser): """ + SITE + """
+Free online converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO and more, also in your browser): """ + SITE + """
 Source code: https://github.com/janwan2003/save-image-format"""
 
 
@@ -102,6 +103,9 @@ def main():
     code, existing = call("GET", f"/addons/addon/{ADDON_ID}/")
     if code == 200:
         code, res = call("POST", f"/addons/addon/{ADDON_ID}/versions/", {"upload": up["uuid"], "license": "MIT"})
+        print("version", code, json.dumps({k: res.get(k) for k in ("id", "version")} if code < 300 else res)[:400])
+        if code < 300:  # keep the listing text in step with the version
+            code, res = call("PATCH", f"/addons/addon/{ADDON_ID}/", {"summary": {"en-US": SUMMARY}, "description": {"en-US": DESCRIPTION}})
     else:
         code, res = call("POST", "/addons/addon/", {
             "categories": ["photos-music-videos", "download-management"],

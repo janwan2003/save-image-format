@@ -174,3 +174,10 @@ output { min-width: 3.2em; font-variant-numeric: tabular-nums; }
 
 .guide-links { padding-left: 1.2em; max-width: 46em; }
 .guide-links li { margin: 0.35em 0; }
+fieldset.control { border: 0; padding: 0; margin: 0; flex-wrap: wrap; }
+fieldset.control legend { font-weight: 600; float: left; margin-right: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border, #ccd); border-radius: 999px; font-size: .9rem; cursor: pointer; }
+#keep-jpeg-control > span { font-weight: 400; }
+.tool:not([data-format="pdf"]) .move { display: none; }
+.btn-icon.move { font-size: 1rem; }
+[hidden] { display: none !important; }

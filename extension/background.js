@@ -12,7 +12,7 @@ async function buildMenus() {
   menuIds.length = 0;
   const create = (props) => { menuIds.push(props.id); chrome.contextMenus.create(props); };
   create({ id: PARENT, title: 'Save image as', contexts: ['image'] });
-  for (const id of ['png', 'jpg', 'webp', 'avif']) {
+  for (const id of ['png', 'jpg', 'webp', 'avif', 'pdf']) {
     if (id !== 'png' && id !== 'jpg' && !(await canEncode(FORMATS[id].mime))) continue;
     create({ id: `save:${id}`, parentId: PARENT, title: FORMATS[id].label, contexts: ['image'] });
   }
