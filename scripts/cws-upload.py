@@ -44,7 +44,6 @@ def call(method, url, body=None, ctype=None):
 
 def main():
     version = json.loads((ROOT / "extension/manifest.json").read_text())["version"]
-    zip_bytes = (ROOT / "packages" / f"saveform-{version}-chrome.zip").read_bytes()
     item = ID_FILE.read_text().strip() if ID_FILE.exists() else None
     if "--status" in sys.argv and item:
         print(call("GET", f"https://www.googleapis.com/chromewebstore/v1.1/items/{item}?projection=DRAFT"))
@@ -52,6 +51,8 @@ def main():
     if "--publish" in sys.argv and item:
         print(call("POST", f"https://www.googleapis.com/chromewebstore/v1.1/items/{item}/publish", b"", "application/json"))
         return
+    # Only an upload needs the package (node scripts/pack-extension.mjs builds it).
+    zip_bytes = (ROOT / "packages" / f"saveform-{version}-chrome.zip").read_bytes()
     if item:
         url = f"https://www.googleapis.com/upload/chromewebstore/v1.1/items/{item}?uploadType=media"
         code, res = call("PUT", url, zip_bytes, "application/zip")

@@ -38,6 +38,9 @@ Demand (the incumbent's users and search volume):
 - Search: "webp to png" ≈110,000/mo and "webp to jpg" ≈130,000/mo in a Semrush keyword
   list for tiny-img.com ([Semrush](https://ko.semrush.com/website/tiny-img.com/overview));
   this is a third-party estimate and the country is not stated.
+- HEIC (session 6): "heic to jpg" ≈246,000/mo, "convert heic to jpg" ≈60,500, "heic to jpg converter" ≈27,100, "heic to jpeg"
+  ≈18,100 in Semrush's overview of heictojpg.com ([Semrush, updated 2025-06-12](https://sv.semrush.com/website/heictojpg.com/overview));
+  third-party estimate, country not stated, ~17 months old. Bigger than the webp terms above, and the field is crowded with upload-based sites.
 - Vendors are already writing articles to capture these searches, e.g. [MConverter blog](https://mconverter.eu/blog/why-save-image-as-type-removed).
 
 Competitors (Chrome Web Store, queried live with curl on 2026-11-20):
@@ -126,16 +129,24 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   site root. `scripts/indexnow.py` pushes every sitemap URL to IndexNow (Bing, Yandex, Seznam, Naver; no account).
   the Chrome Web Store API is not enabled in the operator's Google Cloud project (inbox request filed 2026-11-20).
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 30 converter pages (png/jpg/webp→gif added in session 5, with
+**HEIC input (session 6):** the site decodes HEIC/HEIF (iPhone photos) with libheif compiled to WebAssembly (`site/vendor/libheif/`,
+unmodified `libheif-js` 1.23.5 wasm build, LGPL-3.0, licences + SHA-256 in its README) in a Web Worker (`site/assets/heic-worker.js`,
+`heic.js`), downloaded only when the first HEIC file is added (live: wasm 490 KB gzipped). `decode()` in `extension/lib/convert.js`
+takes per-kind `fallbackDecoders` (the extension passes none, so the extension is unchanged). Pages: /heic-to-jpg/, /heic-to-png/,
+/heic-to-pdf/ and the guide /how-to-open-heic-files-on-windows/; HEIC also works on every other converter page. Test fixtures are made
+by `scripts/make-heic-fixtures.mjs` (own HEIF writer around x265 output, since nothing here writes HEIC): `tests/fixtures/quadrants.heic`
+(single image) and `grid-rotated.heic` (2×2 tile grid + `irot`, like iPhone files).
+
+**Website** (live, https://janwan2003.github.io/save-image-format/): 33 converter pages (+3 HEIC pages in session 6) (png/jpg/webp→gif added in session 5, with
 our own GIF89a encoder `extension/lib/gif.js`: median-cut palette, optional Floyd–Steinberg dithering, 1-bit transparency, LZW; GIF
 is also on the index format menu, not in the extension menu) (index,
 webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
 jfif→jpg/png, image→pdf, favicon generator),
-3 guides (/how-to-save-webp-as-png/, /why-images-save-as-webp/, /save-image-as-type-alternative/), plus privacy, extension and 404 pages;
+4 guides (/how-to-save-webp-as-png/, /why-images-save-as-webp/, /save-image-as-type-alternative/, /how-to-open-heic-files-on-windows/), plus privacy, extension and 404 pages;
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 35 URLs. Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 39 URLs (session 6). Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
