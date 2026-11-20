@@ -891,6 +891,97 @@ test('the general converter also accepts HEIC', async () => {
   await page.close();
 });
 
+/** Width and height from a WebP header (lossy VP8, lossless VP8L or extended VP8X); asserts RIFF/WEBP. */
+function webpSize(b) {
+  assert.equal(b.subarray(0, 4).toString('latin1'), 'RIFF');
+  assert.equal(b.subarray(8, 12).toString('latin1'), 'WEBP');
+  const chunk = b.subarray(12, 16).toString('latin1');
+  if (chunk === 'VP8X') return { width: 1 + b.readUIntLE(24, 3), height: 1 + b.readUIntLE(27, 3), extended: true };
+  if (chunk === 'VP8 ') return { width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff, extended: false };
+  if (chunk === 'VP8L') { const v = b.readUInt32LE(21); return { width: 1 + (v & 0x3fff), height: 1 + ((v >> 14) & 0x3fff), extended: false }; }
+  throw new Error(`unknown WebP chunk ${chunk}`);
+}
+
+// AVIF fixture (ImageMagick 7.1.2 with libheif 1.21.2):
+//   magick -size 64x48 xc:none -fill '#ff0000' -draw 'rectangle 0,0 31,23' -fill '#00ff00' -draw 'rectangle 32,0 63,23'
+//     -fill '#0000ff' -draw 'rectangle 0,24 31,47' -quality 90 tests/fixtures/quadrants-alpha.avif
+// 64×48: red / green / blue quadrants (TL, TR, BL), bottom-right quadrant fully transparent.
+const AVIF_QUADRANTS = join(ROOT, 'tests/fixtures/quadrants-alpha.avif');
+const WEBP_PAGES = ['heic-to-webp', 'avif-to-webp'];
+const DOWNLOAD_ALL_GUIDE = 'how-to-download-all-images-from-a-page';
+
+test('heic-to-webp, avif-to-webp and the download-all guide build with their own title, h1, canonical, sitemap entry and links', async () => {
+  const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
+  const entries = [
+    ...WEBP_PAGES.map((slug) => ({ slug, entry: converters.find((c) => c.slug === slug) })),
+    { slug: DOWNLOAD_ALL_GUIDE, entry: guides.find((g) => g.slug === DOWNLOAD_ALL_GUIDE) },
+  ];
+  for (const { slug, entry } of entries) {
+    assert.ok(entry, `${slug} is defined`);
+    assert.ok(sitemap.includes(`<loc>https://janwan2003.github.io/save-image-format/${slug}/</loc>`), `${slug} in sitemap`);
+    const { page, resp } = await openPage(`/${slug}/`);
+    assert.equal(resp.status(), 200);
+    assert.equal(await page.title(), entry.title);
+    assert.equal(await page.locator('h1').textContent(), entry.h1);
+    assert.equal(await page.locator('link[rel=canonical]').getAttribute('href'), `https://janwan2003.github.io/save-image-format/${slug}/`);
+    if (WEBP_PAGES.includes(slug)) {
+      assert.equal(await page.locator('#format').inputValue(), 'webp', `${slug} defaults to WebP`);
+      assert.equal(await page.locator('.links-grid a[aria-current="page"]').textContent(), slug === 'heic-to-webp' ? 'HEIC to WebP' : 'AVIF to WebP');
+    } else {
+      assert.equal(await page.locator('[data-tool]').count(), 0, 'the guide has no embedded converter');
+      const ext = page.locator('article .prose a[href="../extension/"]');
+      assert.ok(await ext.count() >= 1, 'the guide links the extension page');
+      assert.match(await page.locator('article .prose').innerText(), /store listings are not live yet/);
+    }
+    await page.close();
+  }
+  // Linked from the other pages: converter grids and the footer guide list.
+  const { page } = await openPage('/webp-to-png/');
+  const labels = await page.locator('.links-grid a').allTextContents();
+  for (const l of ['HEIC to WebP', 'AVIF to WebP']) assert.ok(labels.includes(l), `converter grid links "${l}"`);
+  assert.equal(await page.locator(`footer a[href="../${DOWNLOAD_ALL_GUIDE}/"]`).count(), 1, 'footer links the new guide');
+  await page.close();
+});
+
+test('heic-to-webp decodes HEIC photos (plain and iPhone-style grid + rotation) into WebP files with the right size and colours', async () => {
+  const { page } = await openPage('/heic-to-webp/');
+  await page.setInputFiles('#file', [HEIC_QUADRANTS, HEIC_GRID]);
+  await waitForDone(page, 2);
+  const rows = page.locator('#results li');
+
+  const [dl1] = await Promise.all([page.waitForEvent('download'), rows.nth(0).locator('a.btn').click()]);
+  const first = await readFile(await dl1.path());
+  assert.equal(dl1.suggestedFilename(), 'quadrants.webp');
+  assert.deepEqual((({ width, height }) => ({ width, height }))(webpSize(first)), { width: 64, height: 48 });
+  const colours = await quadrantColours(page, 64, 48);
+  [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]].forEach((rgb, i) => assert.ok(near(colours[i], rgb), `quadrant ${i}: ${colours[i]} ≈ ${rgb}`));
+  assert.match(await rows.nth(0).textContent(), /HEIC .* → WebP/);
+
+  const [dl2] = await Promise.all([page.waitForEvent('download'), rows.nth(1).locator('a.btn').click()]);
+  const second = await readFile(await dl2.path());
+  assert.equal(dl2.suggestedFilename(), 'grid-rotated.webp');
+  assert.deepEqual((({ width, height }) => ({ width, height }))(webpSize(second)), { width: 96, height: 128 }, 'tiles joined and rotated to portrait');
+  await page.close();
+});
+
+test('avif-to-webp converts an AVIF with transparency into a WebP that keeps the alpha channel', async () => {
+  const { page } = await openPage('/avif-to-webp/');
+  assert.equal(await page.locator('#format').inputValue(), 'webp');
+  await page.setInputFiles('#file', AVIF_QUADRANTS);
+  await waitForDone(page, 1);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'quadrants-alpha.webp');
+  const size = webpSize(bytes);
+  assert.deepEqual([size.width, size.height], [64, 48]);
+  assert.ok(size.extended && bytes.includes(Buffer.from('ALPH')), 'WebP carries an alpha chunk');
+  assert.match(await page.locator('#results li').first().textContent(), /AVIF .* → WebP/);
+  const opaque = await quadrantColours(page, 64, 48);
+  [[255, 0, 0], [0, 255, 0], [0, 0, 255]].forEach((rgb, i) => assert.ok(near(opaque[i], rgb), `quadrant ${i}: ${opaque[i]} ≈ ${rgb}`));
+  assert.equal((await pixelOfResult(page, 0, 48, 36))[3], 0, 'bottom-right quadrant stays transparent');
+  assert.equal((await pixelOfResult(page, 0, 16, 12))[3], 255, 'top-left quadrant stays opaque');
+  await page.close();
+});
+
 test('every page loads with one h1, unique title/description, valid JSON-LD and working internal links', async () => {
   const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname.slice(BASE_PATH.length));

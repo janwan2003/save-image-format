@@ -13,7 +13,7 @@ export const guides = [
     lede: 'You right-clicked a picture, chose “Save image as…”, and got a .webp file that your editor or upload form refuses. Here are four ways to get a PNG or JPG instead, from quickest to most permanent.',
     tool: { from: 'webp', to: 'png' },
     toolTitle: 'Convert a WebP you already saved',
-    related: ['why-images-save-as-webp', 'save-image-as-type-alternative'],
+    related: ['why-images-save-as-webp', 'save-image-as-type-alternative', 'how-to-download-all-images-from-a-page'],
     converters: ['webp-to-png', 'webp-to-jpg', 'avif-to-png', 'avif-to-jpg'],
     body: (root) => `
 <h2>Why the browser gives you WebP</h2>
@@ -176,6 +176,60 @@ export const guides = [
   <li>It is your own iPhone and storage is not tight: switch the camera to Most Compatible and the problem goes away for new photos.</li>
 </ul>
 <p>The same page also handles other formats Windows and websites stumble over, such as <a href="${root}webp-to-jpg/">WebP</a> and <a href="${root}avif-to-jpg/">AVIF</a>. If those come from saving pictures on websites, <a href="${root}how-to-save-webp-as-png/">our WebP guide</a> explains why.</p>
+`,
+  },
+  {
+    slug: 'how-to-download-all-images-from-a-page',
+    footer: 'Download all images from a page',
+    title: 'How to Download All Images From a Web Page at Once | Saveform',
+    description: 'Three ways to save every image on a web page: the browser’s Save Page As, the developer tools, and a toolbar extension that lists the images and saves them as files, a ZIP or one PDF.',
+    h1: 'How to download all images from a web page',
+    lede: 'Saving pictures one by one with “Save image as…” gets old quickly on a gallery, a product page or a long article. Here are three ways to get all of them, what each one actually gives you, and where each falls short.',
+    related: ['why-images-save-as-webp', 'how-to-save-webp-as-png'],
+    converters: ['webp-to-png', 'webp-to-jpg', 'avif-to-jpg', 'image-to-pdf'],
+    body: (root) => `
+<h2>Before you start: scroll to the bottom</h2>
+<p>Many pages load images only when they scroll into view, and some keep adding more as you go (endless feeds, search results). Whatever method you use, it can only see what the page has at that moment. Scroll through the whole page first, wait for the pictures to appear, and then save.</p>
+
+<h2>Option 1: the browser’s “Save page as”</h2>
+<p>Press <kbd>Ctrl</kbd>+<kbd>S</kbd> (<kbd>⌘</kbd>+<kbd>S</kbd> on a Mac) in Chrome, Edge or Firefox and choose the “complete” web page option in the file type list. The browser writes an HTML file and, next to it, a folder with the files the page used, images among them.</p>
+<p>It needs nothing installed, but the result is rarely what you wanted:</p>
+<ul>
+  <li>The images sit among scripts, stylesheets, icons and tiny tracking images, and some may be renamed.</li>
+  <li>You get the version the browser picked for your screen, not necessarily the largest one the site offers.</li>
+  <li>Files keep the format the site sent, which today is often WebP or AVIF (<a href="${root}why-images-save-as-webp/">why that happens</a>).</li>
+</ul>
+<p>It works best for simple pages, or when you also want a copy of the text.</p>
+
+<h2>Option 2: the developer tools</h2>
+<p>Chrome, Edge and Firefox have built-in developer tools (<kbd>F12</kbd>, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>). Open the <strong>Network</strong> panel, choose the images filter, and reload the page. You see every image the page downloads, with its address, type and size. Right-click an entry to open it in a new tab, then save it from there.</p>
+<p>This is the most precise view of what a page loads, including images that come from stylesheets. It is also one image at a time, which is fine for five pictures and tedious for fifty.</p>
+<p>Firefox has a handier built-in list: press <kbd>Ctrl</kbd>+<kbd>I</kbd> (<kbd>⌘</kbd>+<kbd>I</kbd> on a Mac) to open <em>Page Info</em> and go to the <strong>Media</strong> tab. It lists the page’s images, CSS backgrounds included. Click <strong>Select All</strong> (or pick several entries) and then <strong>Save As…</strong>, choose a folder, and they are saved in one go. They keep whatever format and size the site served.</p>
+
+<h2>Option 3: the Saveform toolbar button</h2>
+<p>We built the Saveform browser extension for exactly this job. Click its toolbar button, or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, and a panel opens with every image on the current page in a grid, each with a preview and, where known, its size. It finds:</p>
+<ul>
+  <li>ordinary images, and for those that offer several sizes, the largest one the page lists rather than the one picked for your screen;</li>
+  <li>images that have not loaded yet because they are waiting to scroll into view, where the page has already put their address in the markup;</li>
+  <li>background images set with CSS, such as banners and gallery tiles, and video poster images.</li>
+</ul>
+<p>Then you choose what to keep and how to save it:</p>
+<ol class="steps-list">
+  <li><strong>Filter.</strong> “Hide smaller than” drops icons and buttons (100 px by default; 50, 200 and 400 px or show all are the other choices). Images whose size is not known yet are never hidden. Untick anything else you do not want, or use Select none and tick a few.</li>
+  <li><strong>Pick a format.</strong> PNG, JPG or WebP converts every image on your device, so a page full of WebP and AVIF arrives as files your other software opens. <em>Original format</em> saves them unchanged. AVIF appears too where the browser can create it.</li>
+  <li><strong>Pick the output.</strong> Separate files in your Downloads folder, <strong>one ZIP file</strong>, or <strong>one PDF</strong> with an image on each page, handy for a set of scanned pages or slides.</li>
+  <li><strong>Save.</strong> The work continues in the background even if you close the panel. If a site does not let extensions read its images, Saveform lists those sites once and asks whether to allow them or skip those images, so a ZIP or PDF still ends up as a single file.</li>
+</ol>
+<p>Limits worth knowing: it lists up to 500 images per page, it cannot run on the browser’s own pages (settings, new tab, extension stores), and images the page has not added yet, such as the next screen of an endless feed, are not there to find. The same extension also adds <em>Save as PNG / JPG / WebP / PDF</em> to the right-click menu for single images.</p>
+<p>Saveform is new and its store listings are not live yet. In Chrome, Edge and other Chromium-based browsers you can load it from its open source code today; <a href="${root}extension/">the extension page</a> has the steps and explains every permission it asks for.</p>
+
+<h2>Which one should you use?</h2>
+<ul>
+  <li>One-off, simple page, format does not matter: <strong>Save page as</strong>.</li>
+  <li>You need to know exactly which file a page loads: <strong>developer tools</strong>, or Page Info in Firefox.</li>
+  <li>You do this regularly, want the largest versions, or need JPG, PNG, a ZIP or a PDF: <strong>the toolbar button</strong>.</li>
+</ul>
+<p>Already saved a folder full of .webp or .avif files? Drop them on <a href="${root}webp-to-jpg/">WebP to JPG</a> or <a href="${root}image-to-pdf/">Image to PDF</a>; they are converted in your browser and can be downloaded together as a ZIP.</p>
 `,
   },
 ];
