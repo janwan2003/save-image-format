@@ -85,7 +85,7 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
 
 Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Format" is an existing listing, so not used).
 
-**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.2; 0.4.2 = 0.4.1 + WebP outputs above 16,383 px refused with a clear message instead of Chromium silently cropping them):
+**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.3; 0.4.2 = 0.4.1 + WebP outputs above 16,383 px refused with a clear message instead of Chromium silently cropping them; 0.4.3 = PDF pages that are pure black and white stored losslessly at 1 bit, grey pages at 8-bit grey (shared `lib/pdf.js`), plus `lib/tiff-write.js` shipped because `convert.js` imports it; TIFF is not in the extension menu):
 - Right-click image → Save image as → PNG / JPG / WebP / PDF (AVIF only where the browser's canvas can
   write it; Chrome 159 cannot, so not shown there) / Copy as PNG. PDF (added in v0.2.0) = one page, page size
   set in settings (same as image by default, or A4 / US Letter), JPEG quality shared with JPG.
@@ -105,8 +105,8 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
   settings page (quality, Save dialog on/off, file name pattern, Downloads subfolder, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.2-chrome.zip` and
-  `packages/saveform-0.4.2-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.3-chrome.zip` and
+  `packages/saveform-0.4.3-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
   offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
@@ -115,12 +115,12 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   superseded unreviewed 0.1.0 file is now `disabled`). The first attempt got HTTP 429 (throttled ~45 min); the retry worked.
   `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
 - **Chrome Web Store: uploaded as a draft, waiting for the operator.** The API works since 2026-11-20 (session 4):
-  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.2 uploaded in session 7 (`--status`: crxVersion 0.4.2).
+  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.3 uploaded in session 9 (`--status`: crxVersion 0.4.3).
   `cws-upload.py --publish` returns 400 listing exactly what the dashboard still needs (contact email + verification,
   language, category, icon, screenshot, description, Privacy practices). Text and files for every field: `store/chrome-privacy.md` (inbox line filed).
 - **AMO v0.3.0 submitted 2026-11-20** (version id 6737975, file `unreviewed`; 0.2.0 file now `disabled`). The listing-text PATCH
   that follows was throttled (429, ~23 h); retry with `python3 scripts/amo-submit.py --listing`.
-- **AMO v0.4.0/0.4.1/0.4.2 NOT yet submitted** (0.4.2 is the one to submit; 0.4.0 never reached AMO): upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
+- **AMO v0.4.0–0.4.3 NOT yet submitted** (0.4.3 is the one to submit; 0.4.0 never reached AMO): upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
   (≈ 2026-11-21 12:25 UTC). Re-run `python3 scripts/amo-submit.py` (it adds the version and PATCHes the new listing text).
 - **v0.3.0 (session 4):** settings for a file name pattern (`{name}`, `{site}`, `{date}`, `{time}`, `{width}`, `{height}`;
   default `{name}`) and a folder inside Downloads (`buildFilename()` in `extension/lib/filename.js`; separators, `..` and
@@ -150,11 +150,20 @@ float samples; bilevel, grey, RGB, palette, CMYK, YCbCr (with JPEG, or subsample
 Orientation; an ICC profile is converted to sRGB with `icc.js`. A **multi-page TIFF becomes one row per page** (`name (page k of N)`,
 output `name-page-k.ext`); PDF rows now preview the page's own JPEG. Not supported (clear error): old-style JPEG (6), LogLuv,
 ThunderScan, LZMA/ZSTD/WebP/JPEG 2000, CIELab, 64-bit float, floating-point predictor. Pages: /tiff-to-jpg/, /tiff-to-png/, /tiff-to-pdf/.
+**TIFF output (session 9):** our own writer `extension/lib/tiff-write.js` (baseline TIFF 6.0, little-endian): LZW with the horizontal
+predictor (8-bit) or uncompressed; picks 1-bit black/white, 8-bit grey, RGB or RGB + unassociated alpha from the pixels; 72 dpi; strips
+of ~64 KB; multi-page files with PageNumber. Site: "TIFF" in every format menu, a Compression select (LZW (smaller) / None (uncompressed)),
+**Download one TIFF** joins all rows in list order (↑/↓ now shown for TIFF as well as PDF), files named `.tif`; PDF and TIFF rows get a
+128 px PNG preview (`preview` option of `convertBlob`). Pages (subagent): /jpg-to-tiff/, /png-to-tiff/, /webp-to-tiff/, /heic-to-tiff/ and
+the guide /how-to-make-a-multi-page-tiff/ (combine and split; ImageMagick/tiffcp/tiffsplit commands run by the subagent). Session 8's two TIFF
+defects are fixed: fax/bilevel PDF pages are 1-bit Flate (libtiff's g3test.tif: 49 KB TIFF → 44 KB PDF, was 529 KB), and an IFD with no
+NewSubfileType tag that is ≤ 1/3 of the previous page's size, same aspect, ≤ 512 px is a thumbnail (dscf0013.tif: 1 page, was 2).
+`npm test` now runs test files one at a time (`--test-concurrency=1`): each file rebuilds `dist/`, and in parallel they collided.
 **/guides/ index (session 8, subagent):** one card per guide plus converters grouped by source format; footer shows 3 guides + "All guides →";
 "Guides" in the header nav. **Store screenshot 2** (`docs/store/screenshot-2-1280x800.png`, the real save-all popup with stubbed data,
 made by `scripts/store-assets.mjs`) is listed in `store/chrome-privacy.md` and `STORE.md` for the operator to upload.
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 36 converter pages (+3 TIFF pages in session 8), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
+**Website** (live, https://janwan2003.github.io/save-image-format/): 36 converter pages (+3 TIFF pages in session 8, +4 →TIFF pages in session 9), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
 our own GIF89a encoder `extension/lib/gif.js`: median-cut palette, optional Floyd–Steinberg dithering, 1-bit transparency, LZW; GIF
 is also on the index format menu, not in the extension menu) (index,
 webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
@@ -163,7 +172,7 @@ jfif→jpg/png, image→pdf, favicon generator),
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 46 URLs (session 8: +3 TIFF pages, +/guides/). Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 51 URLs (session 8: +3 TIFF pages, +/guides/; session 9: +4 →TIFF pages, +1 guide). Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -259,11 +268,28 @@ about 4.0 s in Node. Live after Pages run 44761479874: /tiff-to-jpg/, /tiff-to-p
 sitemap 46 <loc>; live /tiff-to-pdf/ in headless Chromium turned multipage.tif (3 pages) + dscf0013.tif + libtiff's g3test.tif fax into one
 6-page PDF in 777 ms, 0 console errors, requests only to janwan2003.github.io. IndexNow 46 URLs (HTTP 200), sitemap resubmitted (204).
 Screenshot 2 viewed: clean, real popup.
+**Verified (2026-11-20, session 9):** `npm test` 139/139 locally and in GitHub Actions run 44764487964 on commit 60a808c (0 skipped;
+Chromium + Firefox); Pages run 44764488177. New: `tests/tiff-write.test.mjs` (16 cases: photo/noise/alpha/grey/1-bit at odd widths, LZW and
+none, read back pixel-exact by our decoder **and by Pillow 12.1.1 / libtiff**; a 3-page file; LZW edge cases incl. 4,094-entry table resets;
+the thumbnail rule both ways), 2 site tests (PNG with alpha + JPG → exact TIFFs, reorder, Download one TIFF; fax stays 1-bit, multi-page
+TIFF round-trips exactly, Compression None), the fax page of the existing TIFF→PDF test is now asserted 1-bit Flate and pixel-exact, and
+the subagent's `tests/tiff-output-pages.test.mjs` (5: title/h1/canonical/sitemap/default format for the 4 pages, guide on /guides/ with the
+tool). ImageMagick 7 also read every LZW test file identically to Pillow. Real files (libtiff's sample set, in /tmp, not committed):
+g3test.tif → PDF 44 KB (was 529 KB); dscf0013.tif → 1 row (was 2); the other 59 samples' page counts unchanged. Live after Pages run
+44764488177: the 5 new URLs and `/lib/tiff-write.js` return 200, sitemap 51 <loc>; live /heic-to-tiff/ turned 2 HEICs + g3test.tif into one
+3-page TIFF in 1.5 s (Pillow and ImageMagick read RGB, RGB, 1-bit pages), 0 console errors, requests only to janwan2003.github.io.
+Screenshots of the tool (1100 px light, 390 px dark) looked right after fixing a Compression select that overflowed at 390 px. `web-ext lint`
+on the 0.4.3 Firefox zip: 0 errors, 1 warning (UNSUPPORTED_API, offscreen). CWS `--status`: crxVersion 0.4.3. IndexNow 51 URLs (HTTP 200),
+sitemap resubmitted (204).
+**Not verified (session 9):** our TIFFs opened in Photoshop, Windows Photos, macOS Preview or a print shop's RIP (only libtiff/Pillow,
+ImageMagick and our decoder read them; the pages' "GIMP, Photoshop, Preview read LZW" is general knowledge); 1-bit and grey PDF pages in
+Adobe Reader/Preview (poppler-free check: structure + pixel bits); the extension's PDF with the shared change was covered only by the
+existing extension PDF tests (colour images), not with a black-and-white web image; memory for very large TIFF outputs (whole RGBA held,
+plus the compressed strips per row for "Download one TIFF").
 **Not verified (session 8):** TIFF in Safari (decodes TIFF natively, so the worker only runs for pages 2+); TIFFs straight from real
 scanners or Photoshop (only ImageMagick/Pillow-written fixtures and libtiff's samples); multi-hundred-MB scans (memory); the extension
 with the changed `convert.js` (only `sniffType`/`decode` options changed; the extension was not repacked or re-uploaded).
-**Known issues found (session 8):** a thumbnail IFD without NewSubfileType counts as a page (dscf0013.tif shows a 160×120 page 2);
-1-bit fax pages go into the PDF as JPEG at the chosen quality (g3test: 49 KB TIFF → 529 KB PDF page), which should be lossless.
+**Known issues found (session 8):** both fixed in session 9 (see TIFF output above).
 **Not verified (session 7):** HEIC files with HDR gain maps or 10-bit HDR (PQ/HLG are passed through untouched, not tone-mapped); 48 MP
 photos (memory); colour conversion in Safari (decodes HEIC natively, so the worker is not used there); the WebP limit message in the
 extension's in-page notice (same code path as the site, only the site was exercised); browser menu wording quoted in the new guide
@@ -287,17 +313,18 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
 ## Next steps
 
 1. **Operator:** fill the Chrome Web Store dashboard for draft item `iimmananoageikphanfidapckaochlmn` (every field's text and
-   file in `store/chrome-privacy.md`; draft holds 0.4.2; inbox line 2026-11-20; `--publish` still returns 400 listing the fields, 2026-11-20 session 6). Then run `python3 scripts/cws-upload.py --publish`;
+   file in `store/chrome-privacy.md`; draft holds 0.4.3 (session 9); inbox line 2026-11-20; `--publish` still returns 400 listing the fields, 2026-11-20 session 6). Then run `python3 scripts/cws-upload.py --publish`;
    the reply lists anything still missing. Afterwards: CWS link on `site/content/extension.html` and in `calloutHtml()`.
-2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.2 and PATCHes the listing text; if the listing PATCH is
+2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.3 and PATCHes the listing text; if the listing PATCH is
    throttled again, `--listing` later). Check the review (`--status`); when approved, add the AMO link to the site and start AMO metrics.
 3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
    put effort into the page types that get impressions (compare the 4 HEIC URLs, added 2026-11-20, against the WebP ones). Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
 4. Store screenshot of the save-all popup: made in session 8 (`docs/store/screenshot-2-1280x800.png`), listed for the operator in
-   `store/chrome-privacy.md`. Still to do: add it to AMO (not yet supported by `amo-submit.py`) when 0.4.2 is submitted.
-4a. TIFF follow-ups: store bilevel/greyscale PDF pages losslessly (Flate) instead of JPEG (fax PDFs are 10× too big); skip
-   unmarked thumbnail IFDs (much smaller than page 1 and right after it, like dscf0013.tif); speed up LZW (24 MP noise: 4 s);
-   a "multi-page TIFF to PDF" and "open TIFF files" guide; TIFF output (jpg/png→tiff has search demand; own writer is simple).
+   `store/chrome-privacy.md`. Still to do: add it to AMO (not yet supported by `amo-submit.py`) when 0.4.3 is submitted.
+4a. TIFF follow-ups (lossless fax PDF pages, thumbnail skip, TIFF output and the multi-page guide done in session 9): CCITT G4
+   output for 1-bit TIFF pages (fax systems want it; LZW 1-bit is ~same size as G3 input only by luck), a DPI setting for TIFF/PDF output
+   (print shops ask for 300 dpi; we write 72), speed up LZW decoding (24 MP noise: 4 s), an "open TIFF files on Windows/Mac" guide,
+   TIFF in the extension menu only if users ask. Search demand for jpg/png→tiff was assumed, not measured: check it in GSC from December.
 4b. Real-photo coverage: try an HDR iPhone photo (gain map) and a 48 MP HEIC (memory/time), e.g. from libheif's or Apple's public samples.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
@@ -312,6 +339,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-20 (session 9): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
+  CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: sitemap pending, 0 errors/warnings, no search analytics rows
+  for 2026-10-23..2026-11-20.
 
 - 2026-11-20 (session 8): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
   CWS draft crxVersion 0.4.2 (`cws-upload.py --status`); `gsc.py status`: 0 errors/warnings, no search analytics rows for
@@ -384,3 +415,7 @@ The site's converter pages could later carry one unobtrusive ad slot.
   store screenshot 2 (save-all popup); sitemap 42 → 46. Evidence: Actions run 44761479754 116/116 (first push failed 115/116 on a real
   390 px nav wrap, fixed), Pages run 44761479874, libtiff's 61-file sample set vs ImageMagick/Pillow, live 6-page TIFF→PDF in 777 ms,
   IndexNow 46 URLs. Final run 44761975205 on d04fbb5: 116/116, Pages run 44761975388.
+- 2026-11-20 builder (session 9): TIFF output with our own writer (LZW+predictor/none; 1-bit, grey, RGB, RGBA; multi-page "Download one
+  TIFF"), subagent pages jpg/png/webp/heic→tiff + multi-page TIFF guide (sitemap 46 → 51); session 8's TIFF defects fixed (fax PDF pages
+  1-bit lossless: g3test 529 → 44 KB; unmarked camera thumbnails skipped); extension 0.4.3 to the CWS draft. Evidence: Actions run
+  44764487964 139/139, Pages run 44764488177, Pillow/libtiff readback of every writer case, live 3-page HEIC+fax TIFF, IndexNow 51 URLs.
