@@ -2,6 +2,7 @@
 // an extension page, a Firefox background page, or a normal web page.
 // No network access happens here: it takes bytes in and gives bytes out.
 import { makePdf, pageFromCanvas } from './pdf.js';
+import { encodeGif } from './gif.js';
 
 export const FORMATS = {
   png: { id: 'png', mime: 'image/png', ext: 'png', label: 'PNG', lossy: false, opaque: false },
@@ -11,6 +12,9 @@ export const FORMATS = {
   // Containers: the canvas encodes JPEG/PNG and Saveform wraps the result itself.
   pdf: { id: 'pdf', mime: 'application/pdf', ext: 'pdf', label: 'PDF', lossy: true, opaque: true, canvasMime: 'image/jpeg' },
   ico: { id: 'ico', mime: 'image/x-icon', ext: 'ico', label: 'ICO', lossy: false, opaque: false, canvasMime: 'image/png' },
+  // Written entirely by Saveform (lib/gif.js) from the canvas pixels, so every browser can make it.
+  // Not "lossy" in the quality-slider sense: the loss is the 256-colour palette, set by `dither`.
+  gif: { id: 'gif', mime: 'image/gif', ext: 'gif', label: 'GIF', lossy: false, opaque: false, ownEncoder: true },
 };
 
 /** Icon sizes written into an ICO file (each as an embedded PNG). */
@@ -41,6 +45,7 @@ export function sniffType(bytes) {
 /** True if this browser's canvas can encode the given MIME type. */
 const encodeCache = new Map();
 export async function canEncode(mime) {
+  if (Object.values(FORMATS).some((f) => f.mime === mime && f.ownEncoder)) return true;
   const container = Object.values(FORMATS).find((f) => f.mime === mime && f.canvasMime);
   if (container) return canEncode(container.canvasMime);
   if (encodeCache.has(mime)) return encodeCache.get(mime);
@@ -106,9 +111,10 @@ export async function decode(blob, { svgMinSize = 0 } = {}) {
 }
 
 /**
- * Convert a Blob to the target format id ('png' | 'jpg' | 'webp' | 'avif' | 'pdf' | 'ico').
+ * Convert a Blob to the target format id ('png' | 'jpg' | 'webp' | 'avif' | 'pdf' | 'ico' | 'gif').
  * options: quality (0..1, lossy formats; PDF at 1 = lossless), background (CSS color for
- * JPG/PDF), svgMinSize, pageSize ('fit' | 'a4' | 'letter', PDF), icoSizes (ICO).
+ * JPG/PDF), svgMinSize, pageSize ('fit' | 'a4' | 'letter', PDF), icoSizes (ICO),
+ * dither (GIF, default true: Floyd–Steinberg when the image has more than 256 colours).
  * Returns { blob, width, height, sourceKind } and, for PDF, pdfPage (to combine pages later).
  */
 export async function convertBlob(input, formatId, options = {}) {
@@ -132,6 +138,11 @@ export async function convertBlob(input, formatId, options = {}) {
     if (formatId === 'ico') {
       const blob = await makeIco(img, options.icoSizes || ICO_SIZES);
       return { blob, width: img.width, height: img.height, sourceKind: img.kind };
+    }
+    if (formatId === 'gif') {
+      const { data } = ctx.getImageData(0, 0, img.width, img.height);
+      const gif = encodeGif(data, img.width, img.height, { dither: options.dither !== false });
+      return { blob: new Blob([gif], { type: fmt.mime }), width: img.width, height: img.height, sourceKind: img.kind };
     }
     const blob = await canvasToBlob(canvas, fmt.mime, quality);
     if (!blob) throw new Error('The browser could not encode the image');

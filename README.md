@@ -3,7 +3,7 @@
 Right-click an image → **Save image as** → **PNG / JPG / WebP / PDF** (and **AVIF** in browsers that can
 write it), or **Copy as PNG**. The conversion happens on your device, inside the browser.
 
-Website with free in-browser converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO, …):
+Website with free in-browser converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO, PNG to GIF, …):
 https://janwan2003.github.io/save-image-format/
 
 ## Why trust it
