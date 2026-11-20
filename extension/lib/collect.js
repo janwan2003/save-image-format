@@ -40,17 +40,75 @@ export function collectPageImages(limit = 500) {
     out.push({ src, width: Math.round(width) || 0, height: Math.round(height) || 0, kind, alt: (alt || '').slice(0, 120) });
   }
 
+  // Lazy loading: until an image scrolls into view, scripts keep its real address in a data-*
+  // attribute and put a placeholder in src (a tiny data: GIF/SVG, a 1x1, or nothing).
+  // Attribute names, by the convention that uses them:
+  //   data-src          the default of most lazy-load scripts and framework image components
+  //   data-lazy-src     WordPress lazy-load plugins
+  //   data-original     older jQuery-era lazy-load scripts, still common on shop themes
+  //   data-lazy         carousel/slider scripts
+  //   data-srcset, data-lazy-srcset: the same, for a srcset string (also on <picture><source>)
+  // Left out on purpose: generic names such as data-url or data-href (often a link or an API
+  // address, not an image), and hi-res swap attributes (the src there is a real, loaded image).
+  const LAZY_SRC = ['data-src', 'data-lazy-src', 'data-original', 'data-lazy'];
+  const LAZY_SRCSET = ['data-srcset', 'data-lazy-srcset'];
+  const real = (u) => (u && /^(https?:|blob:)/i.test(u) ? u : null);
+  const attrSize = (el, name) => {
+    const m = /^\s*(\d+)(?:px)?\s*$/.exec(el.getAttribute(name) || '');
+    return m ? Number(m[1]) : 0;
+  };
+
+  // The real address of a not-yet-loaded image: the largest "w" candidate of its lazy srcset or
+  // of its <picture> sources, else its lazy src attribute, else the highest "x" candidate.
+  function lazyCandidate(img) {
+    const sets = LAZY_SRCSET.map((a) => img.getAttribute(a));
+    const pic = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+    if (pic) {
+      for (const s of pic.children) {
+        if (s.tagName === 'SOURCE') sets.push(s.getAttribute('srcset'), ...LAZY_SRCSET.map((a) => s.getAttribute(a)));
+      }
+    }
+    const cands = [];
+    for (const set of sets) {
+      if (!set) continue;
+      for (const c of parseSrcset(set)) { const url = real(abs(c.url)); if (url) cands.push({ url, w: c.w, x: c.x }); }
+    }
+    const byW = cands.filter((c) => c.w).sort((a, b) => b.w - a.w)[0];
+    if (byW) return byW;
+    for (const a of LAZY_SRC) {
+      const v = (img.getAttribute(a) || '').trim();
+      const url = v && real(abs(v));
+      if (url) return { url, w: 0 };
+    }
+    return cands.sort((a, b) => b.x - a.x)[0] || null;
+  }
+
   for (const img of document.images) {
-    let src = img.currentSrc || img.src;
+    // img.src turns src="" into the page's own address; treat an empty attribute as no address.
+    let src = img.currentSrc || ((img.getAttribute('src') || '').trim() ? img.src : '');
     let w = img.naturalWidth, h = img.naturalHeight;
-    // Prefer the largest candidate the page offers (srcset "w" descriptors) over the one the
-    // browser picked for the current screen. Only for plain <img>; <picture> sources may
-    // switch format, so the browser's pick is kept there.
-    if (img.srcset && !(img.parentElement && img.parentElement.tagName === 'PICTURE')) {
-      const best = parseSrcset(img.srcset).filter((c) => c.w).sort((a, b) => b.w - a.w)[0];
-      if (best && best.w > w) {
-        const u = abs(best.url);
-        if (u) { if (w) h = (h * best.w) / w; w = best.w; src = u; }
+    const aw = attrSize(img, 'width'), ah = attrSize(img, 'height');
+    // Placeholder: no address, an inline data:/about: one, or not decoded / decoded under 64 px
+    // (1x1 GIFs, blurred previews). A real address from a lazy attribute replaces it.
+    const placeholder = !src || /^(data|about):/i.test(src) || Math.max(w, h) < 64;
+    const lazy = placeholder ? lazyCandidate(img) : null;
+    if (lazy) {
+      // Not loaded, so its size is unknown: the w descriptor, else the width/height attributes,
+      // else 0 (the popup shows 0x0 as "unknown" and never hides it by size).
+      src = lazy.url;
+      if (lazy.w) { w = lazy.w; h = aw && ah ? (ah * lazy.w) / aw : 0; } else { w = aw; h = ah; }
+    } else {
+      // Not decoded yet (for example loading="lazy" below the fold: currentSrc is empty, src is set).
+      if (!w && !h) { w = aw; h = ah; }
+      // Prefer the largest candidate the page offers (srcset "w" descriptors) over the one the
+      // browser picked for the current screen. Only for plain <img>; <picture> sources may
+      // switch format, so the browser's pick is kept there.
+      if (img.srcset && !(img.parentElement && img.parentElement.tagName === 'PICTURE')) {
+        const best = parseSrcset(img.srcset).filter((c) => c.w).sort((a, b) => b.w - a.w)[0];
+        if (best && best.w > w) {
+          const u = abs(best.url);
+          if (u) { if (w) h = (h * best.w) / w; w = best.w; src = u; }
+        }
       }
     }
     add(src, w, h, 'img', img.alt);
