@@ -4,7 +4,7 @@ Right-click an image → **Save image as** → **PNG / JPG / WebP / PDF** (and *
 write it), or **Copy as PNG**. Or click the toolbar button (Alt+Shift+S) to see every image on the page and save
 the ones you pick as separate files, one ZIP or one PDF. The conversion happens on your device, inside the browser.
 
-Website with free in-browser converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO, …):
+Website with free in-browser converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO, PNG to GIF, …):
 https://janwan2003.github.io/save-image-format/
 
 ## Why trust it

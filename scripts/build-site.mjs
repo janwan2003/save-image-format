@@ -56,7 +56,7 @@ const ICON_UPLOAD = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" str
 const ICON_LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
 function toolHtml(page) {
-  const opts = Object.entries({ png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)' })
+  const opts = Object.entries({ png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)', gif: 'GIF' })
     .map(([id, label]) => `<option value="${id}"${id === page.to ? ' selected' : ''}>${label}</option>`).join('');
   const fromLabel = page.from === 'any' ? 'images' : `${FORMAT_LABEL[page.from]} files`;
   const pageSizes = Object.entries({ a4: 'A4', letter: 'US Letter', fit: 'Same as image' })
@@ -65,6 +65,8 @@ function toolHtml(page) {
     .map((n) => `<label class="chip"><input type="checkbox" name="ico-size" value="${n}"${(page.icoSizes || [16, 32, 48, 256]).includes(n) ? ' checked' : ''}>${n}</label>`).join('');
   const keepJpeg = page.keepJpegOption ? `
       <label class="control" id="keep-jpeg-control" for="keep-jpeg"><input type="checkbox" id="keep-jpeg" checked><span>Keep the original JPEG data (rename only, no quality loss)</span></label>` : '';
+  const dither = `
+      <label class="control" id="dither-control" for="dither"><input type="checkbox" id="dither" checked><span>Dither (smoother photos and gradients)</span></label>`;
   const svg = page.svgOption ? `
       <label class="control" for="svg-size"><span>SVG size</span><input type="number" id="svg-size" min="16" max="8192" step="1" value="1024"> px</label>` : '';
   return `<div class="tool" data-tool${page.slug === '' ? ' data-general' : ''}>
@@ -79,7 +81,7 @@ function toolHtml(page) {
       <label class="control" id="quality-control" for="quality"><span>Quality</span><input type="range" id="quality" min="10" max="100" step="1" value="90"><output id="quality-out" for="quality">90%</output></label>
       <label class="control" id="bg-control" for="bg"><span>Background</span><input type="color" id="bg" value="#ffffff"></label>
       <label class="control" id="page-size-control" for="page-size"><span>Page size</span><select id="page-size">${pageSizes}</select></label>
-      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${keepJpeg}${svg}
+      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${keepJpeg}${dither}${svg}
     </div>
     <p class="note" id="format-note" role="status" hidden></p>
     <p class="local-note">${ICON_LOCK}Converted on your device. Nothing is uploaded.</p>
@@ -102,6 +104,7 @@ function stepsHtml(page) {
     png: 'PNG is lossless, so there is nothing to tune. You can still pick another output format.',
     pdf: 'Pick a page size (A4, US Letter, or the size of the image) and the quality; 100% stores the pixels losslessly. Use the arrows to put the pages in order.',
     ico: 'Tick the icon sizes to include. 16, 32 and 48 px cover browser tabs and Windows; 256 px is for high-resolution displays.',
+    gif: 'Leave Dither ticked for photos and gradients. Untick it for flat graphics, screenshots and pixel art: edges stay clean and the file gets smaller.',
   }[page.to];
   const lastStep = page.to === 'pdf'
     ? '<li><strong>Download</strong>Click Download one PDF to get every image as a page of a single file, or save each page as its own PDF.</li>'
@@ -338,6 +341,7 @@ async function main() {
     copyFile(join(ROOT, 'extension/lib/convert.js'), join(DIST, 'lib/convert.js')),
     copyFile(join(ROOT, 'extension/lib/filename.js'), join(DIST, 'lib/filename.js')),
     copyFile(join(ROOT, 'extension/lib/pdf.js'), join(DIST, 'lib/pdf.js')),
+    copyFile(join(ROOT, 'extension/lib/gif.js'), join(DIST, 'lib/gif.js')),
   ]);
   await writeFile(join(DIST, '.nojekyll'), '');
   // Search Console ownership files (scripts/gsc.py token), served from the site root.

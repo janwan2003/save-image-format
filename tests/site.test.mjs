@@ -663,6 +663,146 @@ test('AVIF output option matches what the browser can encode', async () => {
   await page.close();
 });
 
+const GIF_PAGES = ['png-to-gif', 'jpg-to-gif', 'webp-to-gif'];
+
+/** Width, height and colour-table size from a GIF's header; asserts the GIF89a signature and trailer. */
+function gifInfo(b) {
+  assert.equal(b.subarray(0, 6).toString('latin1'), 'GIF89a');
+  assert.equal(b[b.length - 1], 0x3b, 'ends with the GIF trailer');
+  return { width: b.readUInt16LE(6), height: b.readUInt16LE(8), tableSize: 2 << (b[10] & 7), transparent: b.includes(Buffer.from([0x21, 0xf9, 0x04, 0x01])) };
+}
+
+/** A photo-like JPEG (smooth gradients, more than 256 colours) drawn and encoded in the page. */
+async function makePhotoJpeg(page, w, h) {
+  const bytes = await page.evaluate(async ({ w, h }) => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, '#0b3d91'); g.addColorStop(0.5, '#f4a259'); g.addColorStop(1, '#5b8e7d');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    const r = ctx.createRadialGradient(w * 0.7, h * 0.3, 2, w * 0.7, h * 0.3, w * 0.4);
+    r.addColorStop(0, 'rgba(255,255,230,0.9)'); r.addColorStop(1, 'rgba(255,255,230,0)');
+    ctx.fillStyle = r; ctx.fillRect(0, 0, w, h);
+    const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.92));
+    return [...new Uint8Array(await blob.arrayBuffer())];
+  }, { w, h });
+  return Buffer.from(bytes);
+}
+
+/** Mean absolute RGB difference between two encoded images, both decoded by the browser. */
+async function meanDifference(page, a, b) {
+  return page.evaluate(async ({ a, b }) => {
+    const px = async (bytes) => {
+      const bmp = await createImageBitmap(new Blob([new Uint8Array(bytes)]));
+      const c = new OffscreenCanvas(bmp.width, bmp.height);
+      const g = c.getContext('2d');
+      g.drawImage(bmp, 0, 0);
+      return g.getImageData(0, 0, bmp.width, bmp.height).data;
+    };
+    const [x, y] = [await px(a), await px(b)];
+    let sum = 0;
+    for (let i = 0; i < x.length; i += 4) sum += Math.abs(x[i] - y[i]) + Math.abs(x[i + 1] - y[i + 1]) + Math.abs(x[i + 2] - y[i + 2]);
+    return sum / (x.length / 4) / 3;
+  }, { a: [...a], b: [...b] });
+}
+
+test('png-to-gif, jpg-to-gif and webp-to-gif build with their own title, h1, canonical, sitemap entry and GIF controls', async () => {
+  const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
+  assert.equal([...sitemap.matchAll(/<loc>/g)].length, 35, 'sitemap has 35 URLs (32 + 3 GIF pages)');
+  for (const slug of GIF_PAGES) {
+    const entry = converters.find((c) => c.slug === slug);
+    assert.ok(entry, `${slug} is in site/pages.mjs`);
+    assert.ok(sitemap.includes(`<loc>https://janwan2003.github.io/save-image-format/${slug}/</loc>`), `${slug} in sitemap`);
+    const { page, resp } = await openPage(`/${slug}/`);
+    assert.equal(resp.status(), 200);
+    assert.equal(await page.title(), entry.title);
+    assert.equal(await page.locator('h1').textContent(), entry.h1);
+    assert.equal(await page.locator('link[rel=canonical]').getAttribute('href'), `https://janwan2003.github.io/save-image-format/${slug}/`);
+    assert.equal(await page.locator('#format').inputValue(), 'gif');
+    await page.waitForSelector('[data-tool][data-ready="1"]', { state: 'attached' });
+    assert.equal(await page.locator('#format option[value="gif"]').evaluate((o) => o.disabled), false, 'GIF is never switched off');
+    assert.equal(await page.locator('#dither-control').isVisible(), true, 'dither option shown for GIF');
+    assert.equal(await page.locator('#dither').isChecked(), true, 'dither on by default');
+    for (const id of ['#quality-control', '#bg-control', '#ico-control', '#page-size-control']) {
+      assert.equal(await page.locator(id).isVisible(), false, `${id} hidden for GIF`);
+    }
+    assert.equal(await page.locator('.links-grid a[aria-current="page"]').count(), 1);
+    await page.close();
+  }
+  // The general converter offers GIF in its format menu and links the new pages.
+  const { page } = await openPage('/');
+  assert.ok((await page.locator('#format option').allTextContents()).includes('GIF'));
+  await page.selectOption('#format', 'gif');
+  assert.equal(await page.locator('#dither-control').isVisible(), true);
+  await page.selectOption('#format', 'png');
+  assert.equal(await page.locator('#dither-control').isVisible(), false, 'dither hidden for other formats');
+  const labels = await page.locator('.links-grid a').allTextContents();
+  for (const l of ['PNG to GIF', 'JPG to GIF', 'WebP to GIF']) assert.ok(labels.includes(l), `index links "${l}"`);
+  await page.close();
+  // Reverse pages link to the new ones in their text.
+  const gifToPng = await readFile(join(DIST, 'gif-to-png/index.html'), 'utf8');
+  assert.match(gifToPng, /<a href="\.\.\/png-to-gif\/">PNG to GIF<\/a>/);
+});
+
+test('png-to-gif keeps exact colours and turns transparent pixels into GIF transparency', async () => {
+  const { page } = await openPage('/png-to-gif/');
+  const png = await makeFixture(page, 'image/png', 40, 30); // left half transparent, right half #1e88e5
+  await page.setInputFiles('#file', { name: 'logo.png', mimeType: 'image/png', buffer: png });
+  await waitForDone(page, 1);
+  assert.match(await page.locator('#results .result-meta').first().textContent(), /PNG .* → GIF .*40 × 30 px/);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'logo.gif');
+  const info = gifInfo(bytes);
+  assert.deepEqual([info.width, info.height], [40, 30]);
+  assert.equal(info.transparent, true, 'has a Graphic Control Extension with the transparency flag');
+  assert.equal(info.tableSize, 2, 'one colour + transparent');
+  assert.equal((await pixelOfResult(page, 0, 5, 5))[3], 0, 'left half transparent');
+  assert.deepEqual(await pixelOfResult(page, 0, 35, 5), [0x1e, 0x88, 0xe5, 255], 'right half keeps its exact colour');
+  await page.close();
+});
+
+test('jpg-to-gif quantises a photo close to the source; unticking Dither re-converts to a different, valid GIF', async () => {
+  const { page } = await openPage('/jpg-to-gif/');
+  const jpg = await makePhotoJpeg(page, 240, 160);
+  await page.setInputFiles('#file', { name: 'sunset.jpeg', mimeType: 'image/jpeg', buffer: jpg });
+  await waitForDone(page, 1);
+  const dithered = await downloadBytes(page, '#results a.btn');
+  assert.equal(dithered.name, 'sunset.gif');
+  const info = gifInfo(dithered.bytes);
+  assert.deepEqual([info.width, info.height, info.tableSize, info.transparent], [240, 160, 256, false]);
+  const errDithered = await meanDifference(page, jpg, dithered.bytes);
+
+  const oldHref = await page.locator('#results a.btn').getAttribute('href');
+  await page.uncheck('#dither');
+  await page.waitForFunction((old) => {
+    const href = document.querySelector('#results a.btn')?.getAttribute('href');
+    return document.querySelector('#results li')?.dataset.state === 'done' && href && href !== old;
+  }, oldHref);
+  const plain = await downloadBytes(page, '#results a.btn');
+  gifInfo(plain.bytes);
+  assert.ok(!plain.bytes.equals(dithered.bytes), 'Dither off gives different output');
+  const errPlain = await meanDifference(page, jpg, plain.bytes);
+  console.log(`# jpg-to-gif 240x160: JPG ${jpg.length} B; GIF dithered ${dithered.bytes.length} B (mean error ${errDithered.toFixed(2)}), plain ${plain.bytes.length} B (mean error ${errPlain.toFixed(2)})`);
+  assert.ok(errDithered < 8 && errPlain < 5, `colours close to the JPG (${errDithered}, ${errPlain})`);
+  await page.close();
+});
+
+test('webp-to-gif converts a transparent WebP', async () => {
+  const { page } = await openPage('/webp-to-gif/');
+  const webp = await makeFixture(page, 'image/webp', 50, 20);
+  await page.setInputFiles('#file', { name: 'sticker.webp', mimeType: 'image/webp', buffer: webp });
+  await waitForDone(page, 1);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'sticker.gif');
+  const info = gifInfo(bytes);
+  assert.deepEqual([info.width, info.height, info.transparent], [50, 20, true]);
+  assert.equal((await pixelOfResult(page, 0, 3, 10))[3], 0);
+  const [r, g, b, a] = await pixelOfResult(page, 0, 45, 10);
+  assert.ok(a === 255 && Math.abs(r - 0x1e) < 8 && Math.abs(g - 0x88) < 8 && Math.abs(b - 0xe5) < 8, `opaque half stays blue, got ${[r, g, b, a]}`);
+  await page.close();
+});
+
 test('every page loads with one h1, unique title/description, valid JSON-LD and working internal links', async () => {
   const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname.slice(BASE_PATH.length));
@@ -724,6 +864,7 @@ test('built output: robots, sitemap, shared engine copied, no external URLs in a
   assert.match(await readFile(join(DIST, 'robots.txt'), 'utf8'), /Sitemap: https:\/\/janwan2003\.github\.io\/save-image-format\/sitemap\.xml/);
   assert.equal(await readFile(join(DIST, 'lib/convert.js'), 'utf8'), await readFile(join(ROOT, 'extension/lib/convert.js'), 'utf8'));
   assert.equal(await readFile(join(DIST, 'lib/filename.js'), 'utf8'), await readFile(join(ROOT, 'extension/lib/filename.js'), 'utf8'));
+  assert.equal(await readFile(join(DIST, 'lib/gif.js'), 'utf8'), await readFile(join(ROOT, 'extension/lib/gif.js'), 'utf8'));
   for (const f of await readdir(join(DIST, 'assets'))) {
     const src = await readFile(join(DIST, 'assets', f), 'utf8');
     assert.doesNotMatch(src, /https?:\/\//, `${f} references no external URL`);

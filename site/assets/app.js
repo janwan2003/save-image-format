@@ -26,6 +26,8 @@ function init(root) {
   const icoBoxes = [...root.querySelectorAll('input[name="ico-size"]')];
   const keepJpeg = $('#keep-jpeg');
   const keepJpegCtl = $('#keep-jpeg-control');
+  const dither = $('#dither');
+  const ditherCtl = $('#dither-control');
   const downloadPdf = $('#download-pdf');
   const formatNote = $('#format-note');
   const bar = $('#results-bar');
@@ -49,6 +51,7 @@ function init(root) {
     pageSize: pageSize.value,
     icoSizes: icoBoxes.filter((b) => b.checked).map((b) => Number(b.value)),
     keepJpeg: !!keepJpeg?.checked && formatSel.value === 'jpg',
+    dither: dither ? dither.checked : true,
   });
 
   function syncControls() {
@@ -59,6 +62,7 @@ function init(root) {
     bgCtl.hidden = !fmt.opaque || keeping;
     pageSizeCtl.hidden = fmt.id !== 'pdf';
     icoCtl.hidden = fmt.id !== 'ico';
+    if (ditherCtl) ditherCtl.hidden = fmt.id !== 'gif';
     downloadPdf.hidden = fmt.id !== 'pdf';
     root.dataset.format = fmt.id;
     showQuality();
@@ -106,6 +110,7 @@ function init(root) {
   pageSize.addEventListener('change', () => settingsChanged());
   icoBoxes.forEach((b) => b.addEventListener('change', () => settingsChanged(300)));
   keepJpeg?.addEventListener('change', () => settingsChanged());
+  dither?.addEventListener('change', () => settingsChanged());
   bg.addEventListener('input', () => settingsChanged(300));
   svgSize?.addEventListener('change', () => settingsChanged());
 
