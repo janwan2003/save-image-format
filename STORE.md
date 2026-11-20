@@ -4,8 +4,8 @@
 
 | Store | Package | State | How |
 |---|---|---|---|
-| Firefox AMO | `packages/saveform-0.4.1-firefox.zip` | 0.3.0 submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); 0.4.0 was validated (0 errors) but the version POST was throttled until ~2026-11-21 12:30 UTC; 0.4.1 (0.4.0 + lazy-loaded images in save-all) replaces it: re-run `python3 scripts/amo-submit.py` then; will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
-| Chrome Web Store | `packages/saveform-0.4.1-chrome.zip` | 0.4.1 uploaded (2026-11-20, session 6) to draft item `iimmananoageikphanfidapckaochlmn`; publishing waits for the operator to fill the dashboard (`store/chrome-privacy.md`) | `python3 scripts/cws-upload.py` (`--publish`, `--status`) |
+| Firefox AMO | `packages/saveform-0.4.2-firefox.zip` | 0.3.0 submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); 0.4.0 was validated (0 errors) but the version POST was throttled until ~2026-11-21 12:30 UTC; 0.4.2 (0.4.0 + lazy-loaded images in save-all + WebP size guard) replaces it: re-run `python3 scripts/amo-submit.py` then; will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
+| Chrome Web Store | `packages/saveform-0.4.2-chrome.zip` | 0.4.2 uploaded (2026-11-20, session 7) to draft item `iimmananoageikphanfidapckaochlmn`; publishing waits for the operator to fill the dashboard (`store/chrome-privacy.md`) | `python3 scripts/cws-upload.py` (`--publish`, `--status`) |
 | Edge Add-ons | same Chrome zip | needs a Partner Center account (operator) | dashboard upload |
 
 Build both zips with `node scripts/pack-extension.mjs`. The AMO listing text lives in `scripts/amo-submit.py`
