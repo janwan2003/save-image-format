@@ -9,6 +9,7 @@ import { makeZip } from '../lib/zip.js';
 import { decodeHeic } from './heic.js';
 import { decodeTiff, tiffPageCount } from './tiff-client.js';
 import { decodePdf, pdfPageCount, closePdf } from './pdf-client.js';
+import { isRaw, decodeRaw } from './raw.js';
 
 // Formats the browser may not decode itself. HEIC (iPhone photos) goes to a WebAssembly
 // decoder that is only downloaded when the first HEIC file is added; TIFF to our own decoder.
@@ -182,7 +183,10 @@ function init(root) {
   // ---- adding files -------------------------------------------------------
   // A multi-page TIFF (scans, faxes) or a PDF becomes one row per page, in page order.
   async function expand(file) {
-    const kind = sniffType(new Uint8Array(await file.slice(0, 1024).arrayBuffer()));
+    const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+    // Camera RAW first: CR2, NEF, ARW, DNG, ... look like TIFF but must not be split into pages.
+    if (isRaw(head, file.name)) return [{ file, label: file.name, raw: true, outName: file.name.replace(/\.[^.]*$/, '') || 'photo' }];
+    const kind = sniffType(head);
     if (kind !== 'tiff' && kind !== 'pdf') return [{ file, label: file.name }];
     const pdf = kind === 'pdf';
     let pages = 1;
@@ -269,8 +273,8 @@ function init(root) {
         const decoders = item.page != null
           ? { ...FALLBACK_DECODERS, tiff: (b) => decodeTiff(b, item.page), pdf: () => decodePdf(item.file, item.page, { dpi: opts.pdfDpi }) }
           : FALLBACK_DECODERS;
-        const format = opts.format === 'same' ? await sameFormat(item) : opts.format;
-        let r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, format, { ...opts, preview: true, fallbackDecoders: decoders, preferFallback: item.page != null });
+        const format = opts.format === 'same' ? (item.raw ? 'jpg' : await sameFormat(item)) : opts.format;
+        let r = opts.keepJpeg && !item.raw ? await keepJpegBytes(item.file) : await convertBlob(item.file, format, { ...opts, preview: true, fallbackDecoders: decoders, preferFallback: item.page != null, decoder: item.raw ? decodeRaw : null });
         // "Same as original" is for making files smaller: if re-encoding did not help, keep the file.
         if (opts.format === 'same' && !r.resized && item.page == null && r.blob.size >= item.file.size && r.sourceKind === KIND_OF[format]) {
           r = { ...r, blob: new Blob([item.file], { type: FORMATS[format].mime }), keptOriginal: true, targetMet: r.targetBytes ? item.file.size <= r.targetBytes : undefined };
@@ -361,13 +365,14 @@ function init(root) {
       if (r.format !== 'pdf' && r.format !== 'tiff') thumb.src = r.url;
       else if (r.preview) thumb.src = (item.pdfThumb ||= URL.createObjectURL(r.preview));
       else if (r.pdfPage?.filter === 'DCTDecode') thumb.src = (item.pdfThumb ||= URL.createObjectURL(new Blob([r.pdfPage.data], { type: 'image/jpeg' })));
-      else if (r.sourceKind === 'heic' || r.sourceKind === 'tiff' || r.sourceKind === 'pdf') thumb.removeAttribute('src');
+      else if (['heic', 'tiff', 'pdf', 'raw', 'psd'].includes(r.sourceKind)) thumb.removeAttribute('src');
       else thumb.src = (item.preview ||= URL.createObjectURL(item.file));
       const before = item.file.size, after = r.blob.size;
       const pct = Math.round(((after - before) / before) * 100);
       const extra = [];
       if (r.quality != null && r.targetBytes && !r.keptOriginal) extra.push(` · quality ${Math.round(r.quality * 100)}%`);
       if (r.colors && !r.keptOriginal) extra.push(` · ${r.colors} colours`);
+      if (r.sourceKind === 'raw') extra.push(' · ', Object.assign(el('span', 'raw-note'), { textContent: `from the camera’s built-in ${r.sourceWidth} × ${r.sourceHeight} JPEG`, title: 'RAW files carry a JPEG made by the camera; this page converts that picture and does not develop the sensor data.' }));
       if (r.targetBytes && r.targetMet === false) {
         extra.push(' · ', Object.assign(el('span', 'warn'), { textContent: `could not get under ${fmtBytes(r.targetBytes)}; this is the smallest version` }));
       }

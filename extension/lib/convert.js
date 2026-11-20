@@ -88,8 +88,10 @@ function canvasToBlob(canvas, type, quality) {
  * `fallbackDecoders` maps a sniffed kind to an async (blob) => same shape, tried when the
  * browser cannot decode it natively (the site uses this for HEIC and TIFF; the extension passes
  * none). `preferFallback` skips the browser's own decoder (a TIFF page other than the first).
+ * `decoder` replaces all of this for inputs the caller has already recognised (camera RAW on the site).
  */
-export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null, preferFallback = false } = {}) {
+export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null, preferFallback = false, decoder = null } = {}) {
+  if (decoder) return decoder(blob);
   const head = new Uint8Array(await blob.slice(0, 512).arrayBuffer());
   const kind = sniffType(head) || (blob.type.includes('svg') ? 'svg' : null);
   if (kind === 'svg') {

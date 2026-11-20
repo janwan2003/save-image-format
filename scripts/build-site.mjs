@@ -95,7 +95,7 @@ function toolHtml(page) {
       ${ICON_UPLOAD}
       <span class="drop-title">Drop ${esc(fromLabel)} here</span>
       <span class="drop-sub"><span class="linkish">or choose files</span> · or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
-      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff,.pdf,application/pdf">
+      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff,.pdf,application/pdf,.cr2,.cr3,.nef,.nrw,.arw,.dng,.raf,.orf,.rw2,.pef,.srw">
     </label>
     <div class="controls">
       <label class="control" for="format"><span>Convert to</span><select id="format">${opts}</select></label>
@@ -222,7 +222,7 @@ function convertersBySource(root) {
     groups.get(key).push(c);
   }
   const items = [...groups].map(([from, list]) => {
-    const label = from === 'compress' ? 'Compress and resize' : from === 'any' ? 'Any image' : `From ${FORMAT_LABEL[from] || from.toUpperCase()}`;
+    const label = from === 'compress' ? 'Compress and resize' : from === 'raw' ? 'From camera RAW' : from === 'any' ? 'Any image' : `From ${FORMAT_LABEL[from] || from.toUpperCase()}`;
     const links = list.map((c) => `<li><a href="${root}${pagePath(c.slug)}">${esc(c.slug ? linkLabel(c) : 'Any image to any format')}</a></li>`).join('');
     return `<div class="by-source"><h3>${esc(label)}</h3><ul>${links}</ul></div>`;
   });
@@ -428,6 +428,7 @@ async function main() {
     copyFile(join(SITE, 'assets/tiff-worker.js'), join(DIST, 'assets/tiff-worker.js')),
     copyFile(join(SITE, 'assets/tiff-client.js'), join(DIST, 'assets/tiff-client.js')),
     copyFile(join(SITE, 'assets/pdf-client.js'), join(DIST, 'assets/pdf-client.js')),
+    copyFile(join(SITE, 'assets/raw.js'), join(DIST, 'assets/raw.js')),
     copyFile(join(SITE, 'assets/icc.js'), join(DIST, 'assets/icc.js')),
     copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
