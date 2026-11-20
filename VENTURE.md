@@ -185,7 +185,7 @@ itself only gets a clearer error for a PDF. New pages: /pdf-to-jpg/, /pdf-to-png
 "Guides" in the header nav. **Store screenshot 2** (`docs/store/screenshot-2-1280x800.png`, the real save-all popup with stubbed data,
 made by `scripts/store-assets.mjs`) is listed in `store/chrome-privacy.md` and `STORE.md` for the operator to upload.
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 48 converter pages plus the index (counted from `converters` in site/pages.mjs, session 10; the older "36" was stale) (+7 compress/resize pages in session 10, +3 TIFF pages in session 8, +4 →TIFF pages in session 9), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
+**Website** (live, https://janwan2003.github.io/save-image-format/): 51 converter pages plus the index (counted from `converters` in site/pages.mjs; 48 in session 10, +3 PDF pages in session 11) (+7 compress/resize pages in session 10, +3 TIFF pages in session 8, +4 →TIFF pages in session 9), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
 our own GIF89a encoder `extension/lib/gif.js`: median-cut palette, optional Floyd–Steinberg dithering, 1-bit transparency, LZW; GIF
 is also on the index format menu, not in the extension menu) (index,
 webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
@@ -194,7 +194,7 @@ jfif→jpg/png, image→pdf, favicon generator),
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 58 URLs (session 8: +3 TIFF pages, +/guides/; session 9: +4 →TIFF pages, +1 guide; session 10: +7 compress/resize pages). Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 61 URLs (session 11: +3 PDF pages; session 8: +3 TIFF pages, +/guides/; session 9: +4 →TIFF pages, +1 guide; session 10: +7 compress/resize pages). Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -318,6 +318,27 @@ links, control defaults). Two bugs caught by the new tests before pushing: `png-
 1920×1440 on /resize-image/ (0.4 s) and a 256-colour PNG on /compress-png/ (1.9 s); 0 console errors, 0 requests outside janwan2003.github.io.
 Screenshots of /compress-image-to-50kb/ (1100 px light) and /resize-image/ (390 px dark) looked right. IndexNow 58 URLs (HTTP 200), sitemap
 resubmitted (204).
+**Verified (2026-11-20, session 11):** `npm test` 163 tests, 162 pass, 0 fail, 1 skipped (pngcheck not installed) in GitHub Actions run
+44777103765 on commit 08a7d1e; Pages run 44777103818. Locally the first full run was 160/163 with 2 failures, both intended changes caught
+by older rules (pdf-to-jpg had 6 FAQs, the cap is 5; a session 9 test asserted "no PDF input page"); fixed, then 46/46 for those two files.
+New `tests/pdf.test.mjs` (3 cases): the 2-page fixture gives 1240 × 1754 and 1650 × 1275 (rotated) PNGs at 150 dpi with the right quadrant
+colours, the non-embedded Helvetica drawn from `standard_fonts/`, mean difference from poppler `pdftoppm` < 2/255 per page, PDF.js not
+fetched before a PDF is added, only own-origin requests; 72 dpi redraws to 595 × 842; password and junk PDFs give error rows while the
+good PDF's pages go into the ZIP; Download one TIFF holds 2 pages read back by our TIFF decoder; the resolution select appears on the
+general converter only after a PDF is added and hides after Clear. **Real PDFs** (`scripts/real-pdfs.mjs`, first 2 pages at 150 dpi vs
+`pdftoppm`, PDFs from /usr/share on janeks-pc, not committed): CUPS form_russian.pdf (Cyrillic, 1 page), R NEWS.pdf (88 pages), latexmk.pdf
+(66 pages, non-embedded Times), fig2dev manual.pdf (22 pages, 1,018 images), dvipdfmx tug2005.pdf (slides), euromoney-50euro.pdf: all pages
+listed, 0 console errors, mean difference 1.5–9.3/255 (latexmk highest; side-by-side crops looked identical: font substitution and
+anti-aliasing). ImageMagick-made PDFs: JPEG 2000 image 4.5/255 (openjpeg wasm path), CCITT G4 0.5/255, CMYK JPEG 14.7/255 with no pixel
+off by more than 64 (PDF.js colour-manages CMYK, poppler does not; not judged which is closer to print). **Live** after Pages run
+44777103818: the 3 pages, `pdf-client.js`, `pdf.min.js` / `pdf.worker.min.js` (application/javascript; 138 KB + 383 KB gzipped), openjpeg.wasm
+return 200, sitemap 61 <loc>; live /pdf-to-jpg/ in headless Chromium turned the 22-page fig2dev manual + the JPEG 2000 PDF into 23 JPGs
+(5.6 MB ZIP) in 3.3 s including the PDF.js download, the locked PDF showed the password message, 0 console errors, requests only to
+janwan2003.github.io. Screenshots of /pdf-to-jpg/ with 22 pages (1100 px light, 390 px dark) looked right. IndexNow 61 URLs (HTTP 200),
+sitemap resubmitted (204).
+**Not verified (session 11):** PDF input in Firefox and Safari (Chromium only; the Firefox site test does not add a PDF); JBIG2-compressed
+scans (no encoder or sample here); PDFs of hundreds of MB or 500 pages (memory: the whole file is held, up to 3 documents cached); forms with
+unflattened XFA (XFA is off); search demand for the 3 pages (assumed from the general size of "pdf to jpg" queries, no volume source fetched).
 **Not verified (session 10):** palette PNGs opened outside Chromium/Pillow (Photoshop, Windows Photos); the "could not get under …" warning path
 (no test input reached it: even 1 KB is reachable by shrinking); Firefox and Safari for the new controls (only Chromium; the Firefox site test
 did not exercise them); memory/time on 48 MP inputs with a target size (each round re-renders; up to 14 rounds); downscale quality versus a
@@ -389,6 +410,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-20 (session 11): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
+  CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: 0 errors/warnings, no search analytics rows for
+  2026-10-23..2026-11-20.
 
 - 2026-11-20 (session 10): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
   CWS draft crxVersion 0.4.3 (`cws-upload.py --status`); `gsc.py status`: 0 errors/warnings, no search analytics rows for
@@ -479,3 +504,7 @@ The site's converter pages could later carry one unobtrusive ad slot.
   /compress-image-to-20kb/, Pillow readback of every palette PNG case, IndexNow 58 URLs.
   CI on the doc commit 6667d2f (run 44770195566) failed 158/160: a race in the new PNG max-size test (ticking the box converts at the default
   100 KB first; the test read that 95 KB file). Test-only defect, fixed by waiting for the shown size ≤ 60 KB; 3/3 local runs pass.
+- 2026-11-20 builder (session 11): PDF input on every converter page (vendored PDF.js 6.5.438 in a lazily loaded client, one row per page,
+  72–300 dpi select, password/invalid PDF errors) + /pdf-to-jpg/, /pdf-to-png/, /pdf-to-tiff/ (sitemap 58 → 61). Evidence: Actions run
+  44777103765 162 pass / 0 fail / 1 skipped, Pages run 44777103818, new pdf.test.mjs vs poppler, 6 real PDFs + JPX/G4/CMYK PDFs vs poppler,
+  live 23-page conversion in 3.3 s (github.io only), IndexNow 61 URLs.
