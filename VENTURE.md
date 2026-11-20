@@ -89,13 +89,20 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
   settings page (quality, Save dialog on/off, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zip: `node scripts/pack-extension.mjs` → `dist/saveform-0.1.0.zip` (16 files). Listing text and
-  permission justifications in `STORE.md`; images in `docs/store/` (1280x800 screenshot, 440x280 tile).
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.1.0-chrome.zip` (16 files) and
+  `packages/saveform-0.1.0-firefox.zip` (14 files: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+  offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
+- **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
+  `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
+  AMO validation 0 errors / 1 warning (guarded `offscreen` call), 1 screenshot. Check with `python3 scripts/amo-submit.py --status`.
+- **Chrome Web Store: blocked.** `scripts/cws-upload.py` gets a valid token but the upload returns 403 SERVICE_DISABLED:
+  the Chrome Web Store API is not enabled in the operator's Google Cloud project (inbox request filed 2026-11-20).
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 11 converter pages (index,
-webp→png/jpg, avif→png/jpg, png→webp/jpg, jpg→webp/png, svg→png, gif→png) plus privacy, extension and 404 pages;
+**Website** (live, https://janwan2003.github.io/save-image-format/): 16 converter pages (index,
+webp→png/jpg, avif→png/jpg, png→webp/jpg, jpg→webp/png, svg→png/jpg, gif→png/jpg, bmp→png/jpg, ico→png),
+3 guides (/how-to-save-webp-as-png/, /why-images-save-as-webp/, /save-image-as-type-alternative/), plus privacy, extension and 404 pages;
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
-as the extension. Sitemap with 13 URLs. Deployed by `.github/workflows/pages.yml`.
+as the extension. Sitemap with 21 URLs. Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -109,23 +116,26 @@ as the extension. Sitemap with 13 URLs. Deployed by `.github/workflows/pages.yml
   `/sitemap.xml`, `/og-image.png` return 200; a WebP converted on the live page downloaded as a valid
   PNG, with 0 console errors and no requests to hosts other than github.io.
 
-**Not verified:** Firefox at runtime (only linted), the real Chrome permission prompt (cannot be
+**Verified (2026-11-20, session 2):** `npm test` 34/34 locally, including `tests/firefox.test.mjs` (6 cases in real
+Firefox 158 via geckodriver 0.37.1: menu built, same-site WebP→PNG, CORS WebP→JPG, SVG→PNG on the event page, data:→WebP,
+Copy as PNG reports success; clipboard contents not read back). `web-ext lint` on the Firefox zip: 0 errors, 1 warning.
+
+**Not verified:** Firefox with a real context-menu click and the real per-site permission prompt, the real Chrome permission prompt (cannot be
 automated; the test pre-grants access), logged-in sites (Instagram, X, Facebook), images in
 cross-origin iframes, Google Images thumbnails, AVIF output.
 
 ## Next steps
 
-1. **Operator:** register the Chrome Web Store developer account and upload `dist/saveform-0.1.0.zip`
-   with `STORE.md` and `docs/store/` (see OPERATOR-INBOX.md). Then put the store link in
-   `site/content/extension.html` and `calloutHtml()` in `scripts/build-site.mjs`.
-2. Firefox runtime test (`web-ext run` or Playwright Firefox), then an AMO-specific zip without
-   `offscreen`/`service_worker` so the linter is clean; Edge Add-ons uses the Chrome zip.
-3. Field-test logged-in sites and Google Images; check the Firefox clipboard path (Firefox may need
-   the `clipboardWrite` permission for Copy as PNG).
-4. More search pages: "save webp as png chrome", "how to save image as jpg instead of webp",
-   bmp/ico/png→avif pages, a "Save Image as Type alternative" explainer (no trademark use in the product name).
-5. Features users of the old extension expect: "Save as" for page background images, keyboard
+1. **Operator:** enable the Chrome Web Store API in Google Cloud project 964988236925 (OPERATOR-INBOX.md, 2026-11-20).
+   Then run `python3 scripts/cws-upload.py`, and the operator fills the listing in the dashboard once (`STORE.md`, `docs/store/`).
+2. Check the AMO review (`python3 scripts/amo-submit.py --status`). When approved: put the AMO link on
+   `site/content/extension.html` and in `calloutHtml()` in `scripts/build-site.mjs`, update the guide in `site/guides.mjs`,
+   and start recording AMO users/ratings in `## Metrics`. If rejected, read the reviewer's note and resubmit.
+3. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
+4. Features users of the old extension expect: "Save as" for page background images, keyboard
    shortcut, optional filename pattern; "save all images on page" (a later premium candidate).
+5. More search pages: avif→webp (needs an AVIF fixture), png/jpg→avif once Chrome can encode AVIF; "save image as jpg
+   firefox"/"edge" guides. Check the guides' unsourced claims (macOS Preview export, CDN `format=`/`fm=` parameters).
 6. Search Console / Bing Webmaster sitemap submission (needs the operator's account).
 
 ## Monetization plan
@@ -145,3 +155,7 @@ The site's converter pages could later carry one unobtrusive ad slot.
   stage → launched. Evidence: `npm test` 24/24 locally and in Actions run 44731849970; Pages run 44731849996;
   live conversion check on /webp-to-png/; field test 17/20 direct + 1 permission (docs/field-test-2026-11-20.md);
   web-ext lint 0 errors. pnpm unavailable (corepack broken: missing pnpm 12.21.0), so used npm for the one dev dependency.
+- 2026-11-20 builder (session 2): submitted the Firefox build to AMO (add-on 3135549, status nominated) after a new
+  real-Firefox end-to-end test (6/6, Firefox 158); split packaging into Chrome and Firefox zips; CWS upload blocked by the
+  disabled Chrome Web Store API (inbox); added 5 converter pages and 3 guides (sitemap 13 → 21 URLs). Evidence: `npm test`
+  34/34 locally, AMO API status call, web-ext lint 0 errors; CI and live checks below.

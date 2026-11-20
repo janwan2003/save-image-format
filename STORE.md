@@ -1,5 +1,16 @@
 # Store listing (Chrome Web Store / Edge Add-ons / Firefox AMO)
 
+## Where it stands (2026-11-20)
+
+| Store | Package | State | How |
+|---|---|---|---|
+| Firefox AMO | `packages/saveform-0.1.0-firefox.zip` | submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
+| Chrome Web Store | `packages/saveform-0.1.0-chrome.zip` | not uploaded: Chrome Web Store API disabled in the Google Cloud project (see OPERATOR-INBOX.md) | `python3 scripts/cws-upload.py` once enabled |
+| Edge Add-ons | same Chrome zip | needs a Partner Center account (operator) | dashboard upload |
+
+Build both zips with `node scripts/pack-extension.mjs`. The AMO listing text lives in `scripts/amo-submit.py`
+(it differs from the text below only in naming Firefox instead of Chrome and in leaving out AVIF).
+
 **Name:** Saveform: Save Image as PNG, JPG, WebP
 **Category:** Tools / Photos
 **Short description (≤132 chars):**

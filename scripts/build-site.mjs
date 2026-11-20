@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds the static Saveform site into dist/. Plain Node 22, no dependencies.
 //   node scripts/build-site.mjs
-// Pages come from site/pages.mjs (converters) plus site/content/*.html
+// Pages come from site/pages.mjs (converters), site/guides.mjs (articles) plus site/content/*.html
 // (privacy, extension, 404), all rendered through site/template.html.
 // The conversion engine is copied from extension/lib so the site and the
 // extension run the exact same code.
@@ -9,6 +9,7 @@ import { mkdir, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { converters, SITE_URL, REPO_URL, FORMAT_LABEL } from '../site/pages.mjs';
+import { guides } from '../site/guides.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SITE = join(ROOT, 'site');
@@ -111,6 +112,46 @@ function converterLinks(root, currentSlug) {
   return `<ul class="links-grid">\n  ${links.join('\n  ')}\n</ul>`;
 }
 
+function guideLinks(root, slugs = guides.map((g) => g.slug)) {
+  const items = slugs.map((slug) => {
+    const g = guides.find((x) => x.slug === slug);
+    if (!g) throw new Error(`Unknown guide ${slug}`);
+    return `<li><a href="${root}${g.slug}/">${esc(g.h1)}</a></li>`;
+  });
+  return `<ul class="guide-links">\n  ${items.join('\n  ')}\n</ul>`;
+}
+
+function guideMain(guide, root, logo) {
+  const tool = guide.tool ? `<section class="section" aria-labelledby="tool-title">
+  <h2 id="tool-title">${esc(guide.toolTitle)}</h2>
+  ${toolHtml(guide.tool)}
+</section>` : '';
+  const convs = guide.converters.map((slug) => {
+    const c = converters.find((x) => x.slug === slug);
+    if (!c) throw new Error(`Unknown converter ${slug}`);
+    return `<li><a href="${root}${c.slug}/">${FORMAT_LABEL[c.from]} to ${FORMAT_LABEL[c.to]}</a></li>`;
+  }).join('\n  ');
+  return `<article>
+<section class="hero">
+  <h1>${esc(guide.h1)}</h1>
+  <p class="lede">${esc(guide.lede)}</p>
+</section>
+${tool}
+<div class="section prose">
+${guide.body(root).trim()}
+</div>
+</article>
+<section class="section" aria-labelledby="related">
+  <h2 id="related">Related guides</h2>
+  ${guideLinks(root, guide.related)}
+  <h3>Converters</h3>
+  <ul class="links-grid">
+  ${convs}
+  </ul>
+</section>
+${calloutHtml(root, logo)}`;
+}
+
 function calloutHtml(root, logo) {
   return `<aside class="callout" aria-labelledby="ext-callout">
   ${logo}
@@ -138,6 +179,10 @@ ${faqHtml(page)}
 <section class="section" aria-labelledby="more">
   <h2 id="more">More converters</h2>
   ${converterLinks(root, page.slug)}
+</section>
+<section class="section" aria-labelledby="guides">
+  <h2 id="guides">Guides</h2>
+  ${guideLinks(root)}
 </section>
 ${calloutHtml(root, logo)}`;
 }
@@ -182,6 +227,7 @@ async function main() {
       navConvert: navAttr('convert'),
       navExtension: navAttr('extension'),
       navPrivacy: navAttr('privacy'),
+      footerGuides: guides.map((g) => `<a href="${root}${g.slug}/">${esc(g.footer)}</a>`).join(' '),
     });
   }
 
@@ -214,6 +260,29 @@ async function main() {
       main: converterMain(page, root, logo),
     });
     await emit(join(pagePath(page.slug), 'index.html'), html);
+  }
+
+  // Guide pages.
+  for (const guide of guides) {
+    const root = '../';
+    const articleLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: guide.h1,
+      description: guide.description,
+      url: pageUrl(guide.slug),
+      dateModified: UPDATED,
+      inLanguage: 'en',
+      publisher: { '@type': 'Organization', name: 'Saveform', url: SITE_URL },
+    };
+    await emit(join(guide.slug, 'index.html'), render({
+      slug: guide.slug, root,
+      title: guide.title,
+      description: guide.description,
+      head: jsonLd(articleLd),
+      scripts: guide.tool ? `<script type="module" src="${root}assets/app.js"></script>\n` : '',
+      main: guideMain(guide, root, logo),
+    }));
   }
 
   // Static content pages.
@@ -251,7 +320,7 @@ async function main() {
   await writeFile(join(DIST, '.nojekyll'), '');
 
   // Search engine files.
-  const indexable = [...converters.map((p) => p.slug), 'extension', 'privacy'];
+  const indexable = [...converters.map((p) => p.slug), ...guides.map((g) => g.slug), 'extension', 'privacy'];
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${indexable.map((s) => `  <url><loc>${pageUrl(s)}</loc><lastmod>${UPDATED}</lastmod></url>`).join('\n')}

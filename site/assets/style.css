@@ -171,3 +171,6 @@ output { min-width: 3.2em; font-variant-numeric: tabular-nums; }
   .callout { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.guide-links { padding-left: 1.2em; max-width: 46em; }
+.guide-links li { margin: 0.35em 0; }

@@ -215,6 +215,13 @@ export async function saveBlob(blob, filename, saveAs) {
 }
 
 async function copyInPage(job, blob) {
+  // Firefox: the background is an event page with clipboardWrite, so it can write directly.
+  if (typeof document !== 'undefined' && typeof ClipboardItem !== 'undefined') {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      return;
+    } catch { /* fall back to writing from the page */ }
+  }
   const [res] = await chrome.scripting.executeScript({
     target: { tabId: job.tabId, frameIds: [job.frameId || 0] },
     func: pageCopyPng,

@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Submit packages/saveform-<version>-firefox.zip to Firefox AMO (addons.mozilla.org API v5).
+
+First run creates the listed add-on with its listing text; later runs add a new version.
+Credentials: AMO_JWT_ISSUER / AMO_JWT_SECRET from the studio .env (never printed).
+Usage: python3 scripts/amo-submit.py            # upload + create or add version
+       python3 scripts/amo-submit.py --status   # show the add-on's review status
+"""
+import base64, hashlib, hmac, json, sys, time, urllib.error, urllib.request, uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+ENV = dict(l.split("=", 1) for l in (ROOT.parent.parent / ".env").read_text().splitlines() if "=" in l)
+API = "https://addons.mozilla.org/api/v5"
+ADDON_ID = "saveform@save-image-format"
+SITE = "https://janwan2003.github.io/save-image-format/"
+
+SUMMARY = ("Right-click any image and save it as PNG, JPG or WebP, or copy it as PNG. "
+           "Converted on your device. No tracking, no network calls, open source.")
+DESCRIPTION = """Saveform adds "Save image as" to the right-click menu for images, with a submenu: PNG, JPG, WebP, and "Copy as PNG".
+
+Useful when "Save Image As…" gives you a .webp or .avif file that your editor, slide deck, upload form or older system will not open.
+
+• Converts on your device. The image is never uploaded anywhere.
+• No analytics, no ads, no account, no remote code.
+• Asks for almost nothing: no access to the pages you browse. If a server blocks add-ons from reading an image, Saveform asks for access to that one site, and you can revoke it.
+• Keeps transparency in PNG and WebP; fills it with white (or a colour you pick) for JPG.
+• Renders SVG images at a usable size (1024 px by default).
+• Choose JPG and WebP quality, and whether to see the Save dialog each time.
+• Open source (MIT): every file in the package can be checked against the GitHub source.
+
+Free online converters (WebP to PNG, AVIF to JPG and more, also in your browser): """ + SITE + """
+Source code: https://github.com/janwan2003/save-image-format"""
+
+
+def jwt():
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+    now = int(time.time())
+    head = b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+    body = b64(json.dumps({"iss": ENV["AMO_JWT_ISSUER"], "jti": str(uuid.uuid4()), "iat": now, "exp": now + 60}).encode())
+    sig = b64(hmac.new(ENV["AMO_JWT_SECRET"].encode(), f"{head}.{body}".encode(), hashlib.sha256).digest())
+    return f"JWT {head}.{body}.{sig}"
+
+
+def call(method, path, data=None, files=None):
+    headers = {"Authorization": jwt()}
+    body = None
+    if files:
+        boundary = uuid.uuid4().hex
+        parts = []
+        for k, v in (data or {}).items():
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+        for k, (name, content) in files.items():
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"; filename="{name}"\r\n'
+                         f'Content-Type: application/zip\r\n\r\n'.encode() + content + b"\r\n")
+        body = b"".join(parts) + f"--{boundary}--\r\n".encode()
+        headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+    elif data is not None:
+        body = json.dumps(data).encode()
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(API + path, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, json.loads(r.read() or b"null")
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read() or b"null")
+
+
+def status():
+    code, a = call("GET", f"/addons/addon/{ADDON_ID}/")
+    if code != 200:
+        print("not found", code, a); return
+    v = a.get("latest_unlisted_version") or a.get("current_version")
+    print(json.dumps({"status": a.get("status"), "slug": a.get("slug"), "url": a.get("url"),
+                      "current_version": (a.get("current_version") or {}).get("version")}, indent=1))
+    code, vs = call("GET", f"/addons/addon/{ADDON_ID}/versions/?filter=all_with_unlisted")
+    for ver in (vs or {}).get("results", [])[:3]:
+        print("version", ver["version"], "file status:", ver.get("file", {}).get("status"))
+
+
+def main():
+    if "--status" in sys.argv:
+        return status()
+    version = json.loads((ROOT / "extension/manifest.json").read_text())["version"]
+    zip_path = ROOT / "packages" / f"saveform-{version}-firefox.zip"
+    code, up = call("POST", "/addons/upload/", {"channel": "listed"}, {"upload": (zip_path.name, zip_path.read_bytes())})
+    print("upload", code, {k: up.get(k) for k in ("uuid", "processed", "valid")} if isinstance(up, dict) else up)
+    if code >= 300:
+        print(up); sys.exit(1)
+    for _ in range(60):
+        code, up = call("GET", f"/addons/upload/{up['uuid']}/")
+        if up.get("processed"):
+            break
+        time.sleep(2)
+    v = up.get("validation") or {}
+    print("validation: valid=%s errors=%s warnings=%s" % (up.get("valid"), v.get("errors"), v.get("warnings")))
+    if not up.get("valid"):
+        for m in v.get("messages", []):
+            if m.get("type") == "error":
+                print(" -", m.get("message"), m.get("file"))
+        sys.exit(1)
+    code, existing = call("GET", f"/addons/addon/{ADDON_ID}/")
+    if code == 200:
+        code, res = call("POST", f"/addons/addon/{ADDON_ID}/versions/", {"upload": up["uuid"], "license": "MIT"})
+    else:
+        code, res = call("POST", "/addons/addon/", {
+            "categories": ["photos-music-videos", "download-management"],
+            "summary": {"en-US": SUMMARY},
+            "description": {"en-US": DESCRIPTION},
+            "homepage": {"en-US": SITE},
+            "support_url": {"en-US": "https://github.com/janwan2003/save-image-format/issues"},
+            "version": {"upload": up["uuid"], "license": "MIT"},
+        })
+    print("create", code, json.dumps({k: res.get(k) for k in ("id", "slug", "status", "url")} if code < 300 else res)[:800])
+    if code >= 300:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

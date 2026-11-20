@@ -10,9 +10,10 @@ import { readFile, stat, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { homedir } from 'node:os';
 import { crc32 } from 'node:zlib';
 import { chromium } from 'playwright-core';
+import { converters } from '../site/pages.mjs';
+import { guides } from '../site/guides.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
@@ -48,9 +49,8 @@ before(async () => {
   try {
     browser = await chromium.launch();
   } catch {
-    browser = await chromium.launch({
-      executablePath: join(homedir(), '.cache/ms-playwright/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell'),
-    });
+    // No headless shell for this Playwright version: use the full Chromium build in new headless mode.
+    browser = await chromium.launch({ channel: 'chromium' });
   }
   context = await browser.newContext({ acceptDownloads: true });
   context.on('request', (r) => {
@@ -216,7 +216,7 @@ test('Download all builds a valid stored ZIP with one entry per file and unique 
 test('svg-to-png scales small SVGs up to the chosen size; gif-to-png converts a GIF', async () => {
   const { page } = await openPage('/svg-to-png/');
   await page.fill('#svg-size', '200');
-  await page.locator('#svg-size').dispatchEvent('change');
+  await page.locator('#svg-size').blur(); // fires the native change once, before files are added
   const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="20" height="20" fill="#0a0"/></svg>');
   await page.setInputFiles('#file', { name: 'icon.svg', mimeType: 'image/svg+xml', buffer: svg });
   await waitForDone(page, 1);
@@ -235,6 +235,123 @@ test('svg-to-png scales small SVGs up to the chosen size; gif-to-png converts a 
   assert.deepEqual(out.bytes.subarray(0, 8), PNG_MAGIC);
   assert.deepEqual((await pixelOfResult(gifPage, 0, 0, 0)).slice(0, 3), [255, 0, 0]);
   await gifPage.close();
+});
+
+/** 24-bit bottom-up BMP: left half red, right half blue. */
+function makeBmp(w, h) {
+  const row = Math.ceil((w * 3) / 4) * 4;
+  const b = Buffer.alloc(54 + row * h);
+  b.write('BM', 0, 'latin1');
+  b.writeUInt32LE(b.length, 2);
+  b.writeUInt32LE(54, 10);
+  b.writeUInt32LE(40, 14);
+  b.writeInt32LE(w, 18); b.writeInt32LE(h, 22);
+  b.writeUInt16LE(1, 26); b.writeUInt16LE(24, 28);
+  b.writeUInt32LE(row * h, 34);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = 54 + y * row + x * 3; // BGR
+      if (x < w / 2) b[o + 2] = 255; else b[o] = 255;
+    }
+  }
+  return b;
+}
+
+/** ICO container with a single embedded PNG image. */
+function makeIco(png, w, h) {
+  const head = Buffer.alloc(22);
+  head.writeUInt16LE(0, 0); head.writeUInt16LE(1, 2); head.writeUInt16LE(1, 4);
+  head[6] = w >= 256 ? 0 : w; head[7] = h >= 256 ? 0 : h;
+  head.writeUInt16LE(1, 10); head.writeUInt16LE(32, 12);
+  head.writeUInt32LE(png.length, 14); head.writeUInt32LE(22, 18);
+  return Buffer.concat([head, png]);
+}
+
+test('bmp-to-png and bmp-to-jpg decode a real BMP and write the right type and size', async () => {
+  const bmp = makeBmp(30, 20);
+  const { page } = await openPage('/bmp-to-png/');
+  assert.equal(await page.locator('#format').inputValue(), 'png');
+  await page.setInputFiles('#file', { name: 'scan.bmp', mimeType: 'image/bmp', buffer: bmp });
+  await waitForDone(page, 1);
+  assert.match(await page.locator('#results .result-meta').first().textContent(), /BMP .* → PNG .*30 × 20 px/);
+  let out = await downloadBytes(page, '#results a.btn');
+  assert.equal(out.name, 'scan.png');
+  assert.deepEqual(out.bytes.subarray(0, 8), PNG_MAGIC);
+  assert.deepEqual([out.bytes.readUInt32BE(16), out.bytes.readUInt32BE(20)], [30, 20]);
+  assert.deepEqual(await pixelOfResult(page, 0, 2, 2), [255, 0, 0, 255], 'left half red');
+  assert.deepEqual(await pixelOfResult(page, 0, 27, 17), [0, 0, 255, 255], 'right half blue');
+  await page.close();
+
+  const jpgPage = (await openPage('/bmp-to-jpg/')).page;
+  assert.equal(await jpgPage.locator('#format').inputValue(), 'jpg');
+  await jpgPage.setInputFiles('#file', { name: 'scan.bmp', mimeType: 'image/bmp', buffer: bmp });
+  await waitForDone(jpgPage, 1);
+  out = await downloadBytes(jpgPage, '#results a.btn');
+  assert.equal(out.name, 'scan.jpg');
+  assert.deepEqual([...out.bytes.subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  assert.deepEqual(jpegSize(out.bytes), { width: 30, height: 20 });
+  await jpgPage.close();
+});
+
+test('ico-to-png extracts the icon with transparency', async () => {
+  const { page } = await openPage('/ico-to-png/');
+  assert.equal(await page.locator('#format').inputValue(), 'png');
+  const ico = makeIco(await makeFixture(page, 'image/png', 32, 32), 32, 32);
+  await page.setInputFiles('#file', { name: 'favicon.ico', mimeType: 'image/x-icon', buffer: ico });
+  await waitForDone(page, 1);
+  assert.match(await page.locator('#results .result-meta').first().textContent(), /ICO .* → PNG .*32 × 32 px/);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'favicon.png');
+  assert.deepEqual(bytes.subarray(0, 8), PNG_MAGIC);
+  assert.equal((await pixelOfResult(page, 0, 3, 3))[3], 0, 'transparent half kept');
+  assert.equal((await pixelOfResult(page, 0, 28, 3))[3], 255, 'opaque half kept');
+  await page.close();
+});
+
+test('svg-to-jpg renders on a solid background; gif-to-jpg writes a JPEG', async () => {
+  const { page } = await openPage('/svg-to-jpg/');
+  assert.equal(await page.locator('#format').inputValue(), 'jpg');
+  assert.equal(await page.locator('#svg-size').count(), 1, 'SVG size option shown');
+  await page.fill('#svg-size', '100');
+  await page.locator('#svg-size').blur(); // fires the native change once, before files are added
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><rect x="10" width="10" height="10" fill="#000"/></svg>');
+  await page.setInputFiles('#file', { name: 'logo.svg', mimeType: 'image/svg+xml', buffer: svg });
+  await waitForDone(page, 1);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'logo.jpg');
+  assert.deepEqual(jpegSize(bytes), { width: 100, height: 50 });
+  const [r, g, b] = await pixelOfResult(page, 0, 10, 25);
+  assert.ok(r > 240 && g > 240 && b > 240, `empty SVG area is white, got ${[r, g, b]}`);
+  await page.close();
+
+  const gifPage = (await openPage('/gif-to-jpg/')).page;
+  const gif = Buffer.from('R0lGODlhAQABAIAAAP8AAAAAACwAAAAAAQABAAACAkQBADs=', 'base64');
+  await gifPage.setInputFiles('#file', { name: 'dot.gif', mimeType: 'image/gif', buffer: gif });
+  await waitForDone(gifPage, 1);
+  const out = await downloadBytes(gifPage, '#results a.btn');
+  assert.equal(out.name, 'dot.jpg');
+  assert.deepEqual([...out.bytes.subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  await gifPage.close();
+});
+
+test('guide pages with an embedded converter convert a pasted image', async () => {
+  for (const g of guides.filter((x) => x.tool)) {
+    const { page } = await openPage(`/${g.slug}/`);
+    assert.equal(await page.locator('#format').inputValue(), g.tool.to, `${g.slug} defaults to ${g.tool.to}`);
+    await page.evaluate(async () => {
+      const c = document.createElement('canvas');
+      c.width = 12; c.height = 8;
+      c.getContext('2d').fillRect(0, 0, 12, 8);
+      const blob = await new Promise((r) => c.toBlob(r, 'image/webp'));
+      const dt = new DataTransfer();
+      dt.items.add(new File([blob], 'image.webp', { type: 'image/webp' }));
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await waitForDone(page, 1);
+    assert.match(await page.locator('#results .result-meta').textContent(), /12 × 8 px/);
+    assert.match(await page.locator('#results a.btn').getAttribute('download'), new RegExp(`\\.${g.tool.to}$`));
+    await page.close();
+  }
 });
 
 test('pasting an image from the clipboard converts it', async () => {
@@ -272,7 +389,10 @@ test('AVIF output option matches what the browser can encode', async () => {
 test('every page loads with one h1, unique title/description, valid JSON-LD and working internal links', async () => {
   const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname.slice(BASE_PATH.length));
-  assert.equal(urls.length, 13);
+  const expected = converters.length + guides.length + 2; // + extension, privacy
+  assert.equal(urls.length, expected);
+  for (const g of guides) assert.ok(urls.includes(`/${g.slug}/`), `sitemap lists guide ${g.slug}`);
+  for (const c of converters) assert.ok(urls.includes(c.slug ? `/${c.slug}/` : '/'), `sitemap lists converter ${c.slug || 'index'}`);
   const titles = new Set(), descriptions = new Set();
   for (const path of urls) {
     const { page, resp } = await openPage(path);
@@ -283,13 +403,26 @@ test('every page loads with one h1, unique title/description, valid JSON-LD and 
     const canonical = await page.locator('link[rel=canonical]').getAttribute('href');
     assert.equal(new URL(canonical).pathname, BASE_PATH + path, `${path} canonical`);
     for (const ld of await page.locator('script[type="application/ld+json"]').allTextContents()) JSON.parse(ld);
-    const isConverter = await page.locator('[data-tool]').count();
+    const isConverter = converters.some((c) => (c.slug ? `/${c.slug}/` : '/') === path);
     if (isConverter) {
       const faq = JSON.parse((await page.locator('script[type="application/ld+json"]').first().textContent()));
       assert.equal(faq['@type'], 'FAQPage');
       assert.ok(faq.mainEntity.length >= 4 && faq.mainEntity.length <= 5, `${path} FAQ has 4-5 questions`);
-      assert.equal(await page.locator('.links-grid a').count(), 11, `${path} links to all converters`);
+      assert.equal(await page.locator('.links-grid a').count(), converters.length, `${path} links to all converters`);
+      assert.equal(await page.locator('.guide-links a').count(), guides.length, `${path} links to all guides`);
     }
+    const guide = guides.find((g) => `/${g.slug}/` === path);
+    if (guide) {
+      const article = JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent());
+      assert.equal(article['@type'], 'Article');
+      assert.equal(article.headline, await page.locator('h1').textContent());
+      const words = (await page.locator('article .prose').innerText()).split(/\s+/).filter(Boolean).length;
+      assert.ok(words >= 450 && words <= 1000, `${path} has ${words} words of guide text`);
+      assert.equal(await page.locator('.guide-links a').count(), guide.related.length, `${path} links its related guides`);
+      assert.equal(await page.locator('[data-tool]').count(), guide.tool ? 1 : 0, `${path} embeds the converter only when configured`);
+    }
+    const footerHrefs = await page.locator('footer a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+    for (const g of guides) assert.ok(footerHrefs.some((h) => h.endsWith(`${g.slug}/`)), `${path} footer links ${g.slug}`);
     // Every same-site link resolves to a file in dist/.
     for (const href of await page.locator('a[href]').evaluateAll((as) => as.map((a) => a.href))) {
       const u = new URL(href);
@@ -299,8 +432,8 @@ test('every page loads with one h1, unique title/description, valid JSON-LD and 
     }
     await page.close();
   }
-  assert.equal(titles.size, 13, 'titles are unique');
-  assert.equal(descriptions.size, 13, 'descriptions are unique');
+  assert.equal(titles.size, expected, 'titles are unique');
+  assert.equal(descriptions.size, expected, 'descriptions are unique');
 
   // The 404 page uses absolute /save-image-format/ paths (served at any depth on GitHub Pages).
   const { page, resp } = await openPage('/no-such-page/', { allow: [/status of 404/] });

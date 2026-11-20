@@ -37,16 +37,18 @@ https://janwan2003.github.io/save-image-format/
    `extension` folder.
 
 Firefox (142+): `about:debugging` → This Firefox → Load Temporary Add-on → `extension/manifest.json`.
-(Firefox support is written but not yet tested; see the issue tracker.)
+Firefox: submitted to addons.mozilla.org on 2026-11-20 and waiting for Mozilla's review. The Firefox build passes the same end-to-end checks in real Firefox (`tests/firefox.test.mjs`).
 
 ## Develop
 
 ```
 npm install            # playwright-core, used by the tests only
 npx playwright-core install chromium
-npm test               # unit + end-to-end tests in headless Chromium
+npm test               # unit + end-to-end tests in headless Chromium (and Firefox, if firefox + geckodriver are installed)
 node scripts/build-site.mjs        # builds the website into dist/
-node scripts/pack-extension.mjs    # builds dist/saveform-<version>.zip
+node scripts/pack-extension.mjs    # builds packages/saveform-<version>-chrome.zip and -firefox.zip
+python3 scripts/amo-submit.py      # uploads the Firefox zip to AMO (keys from the studio .env)
+python3 scripts/cws-upload.py      # uploads the Chrome zip to the Chrome Web Store
 ```
 
 ## Known limits

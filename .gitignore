@@ -3,3 +3,6 @@ dist/
 *.zip
 test-results/
 .DS_Store
+tmp-firefox-test-*/
+packages/
+__pycache__/

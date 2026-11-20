@@ -1,0 +1,131 @@
+// Guide (article) pages. The build script renders each entry into <slug>/index.html.
+// `body(root)` returns trusted HTML; `root` is the relative path to the site root.
+// `tool` embeds the converter (same markup and script as the converter pages).
+// All prose here is original.
+
+export const guides = [
+  {
+    slug: 'how-to-save-webp-as-png',
+    footer: 'Save WebP as PNG or JPG',
+    title: 'How to Save a WebP Image as PNG or JPG (Chrome, Firefox, Edge) | Saveform',
+    description: 'Step-by-step ways to save a WebP image from a website as PNG or JPG in Chrome, Firefox and Edge: copy and paste, an in-browser converter, or a right-click extension.',
+    h1: 'How to save a WebP image as PNG or JPG',
+    lede: 'You right-clicked a picture, chose “Save image as…”, and got a .webp file that your editor or upload form refuses. Here are four ways to get a PNG or JPG instead, from quickest to most permanent.',
+    tool: { from: 'webp', to: 'png' },
+    toolTitle: 'Convert a WebP you already saved',
+    related: ['why-images-save-as-webp', 'save-image-as-type-alternative'],
+    converters: ['webp-to-png', 'webp-to-jpg', 'avif-to-png', 'avif-to-jpg'],
+    body: (root) => `
+<h2>Why the browser gives you WebP</h2>
+<p>A browser’s own “Save image as…” stores the file exactly as the website sent it. It does not convert anything. Many sites send WebP (or the newer AVIF) because those files are smaller than JPG or PNG and pages load faster. Often the address even ends in <code>.jpg</code> while the server actually delivers WebP, because it picks the format based on what your browser says it can display. The full story is in <a href="${root}why-images-save-as-webp/">why images save as WebP</a>.</p>
+<p>None of the major browsers has a setting to save in a different format, so you need one extra step. Pick the method that suits how often you do this.</p>
+
+<h2>Method 1: copy the image and paste it into a converter</h2>
+<p>This works in every current browser and needs nothing installed.</p>
+<ol class="steps-list">
+  <li>Right-click the image and choose <strong>Copy image</strong> (Chrome and Edge) or <strong>Copy Image</strong> (Firefox).</li>
+  <li>Open the converter on this page (above) or the <a href="${root}">main converter</a>.</li>
+  <li>Press <kbd>Ctrl</kbd>+<kbd>V</kbd> (<kbd>⌘</kbd>+<kbd>V</kbd> on a Mac). The pasted image is converted on your device.</li>
+  <li>Choose PNG or JPG and click <strong>Download</strong>.</li>
+</ol>
+<p>Browsers put a copied image on the clipboard as plain pixels, so the original WebP compression does not matter. Animated images give you a single frame.</p>
+
+<h2>Method 2: save the WebP, then convert the file</h2>
+<p>If you already have .webp files on your computer, drop them on the box above. You can add many at once and download the results together as a ZIP. Use <a href="${root}webp-to-png/">WebP to PNG</a> when you want lossless output or transparency, and <a href="${root}webp-to-jpg/">WebP to JPG</a> when you want small files that open everywhere.</p>
+<p>The conversion runs in your browser tab. The files are never uploaded, which matters for screenshots, scans and anything private.</p>
+
+<h2>Method 3: use a built-in app on your computer</h2>
+<ul>
+  <li><strong>macOS:</strong> recent versions of Preview open WebP. Choose <em>File → Export</em> and pick PNG or JPEG as the format.</li>
+  <li><strong>Windows:</strong> whether Paint or Photos can open WebP depends on your Windows version and the image codecs installed. If Paint opens it, <em>File → Save as</em> lets you pick PNG or JPEG. If it refuses the file, use method 1 or 2.</li>
+  <li><strong>Linux:</strong> most image viewers built on current libraries open WebP and offer “Save as” or “Export”.</li>
+</ul>
+<p>This is fine for one or two pictures, but it means opening another program every time.</p>
+
+<h2>Method 4: add “Save as PNG / JPG” to the right-click menu</h2>
+<p>If you save images from the web often, a browser extension removes the extra steps: right-click the picture, choose the format, and the converted file lands in your Downloads folder. When choosing one, check what it asks for. An image saver needs to read the image you clicked and write a download; it does not need to read every page you visit or send anything to a server. Our article on <a href="${root}save-image-as-type-alternative/">choosing a replacement image-saving extension</a> explains what to look for and why it matters.</p>
+<p>Saveform, made by the same people as this site, is one such extension: open source, converted locally, and it asks for access to a site only when that site’s server blocks the download. See <a href="${root}extension/">the extension page</a> for how to install it.</p>
+
+<h2>PNG or JPG: which should you pick?</h2>
+<ul>
+  <li><strong>PNG</strong> for screenshots, logos, diagrams, anything with text or transparency, and images you will edit again. It is lossless but larger.</li>
+  <li><strong>JPG</strong> for photographs you want to email, upload or print. Use a quality of 85–92%. Transparent areas become a solid colour (white by default).</li>
+</ul>
+<p>Neither can restore detail the WebP already threw away; converting only changes the container, so the result looks the same as what you saw in the browser.</p>`,
+  },
+  {
+    slug: 'why-images-save-as-webp',
+    footer: 'Why images save as WebP',
+    title: 'Why Do Images Save as WebP? How to Get JPG or PNG Instead | Saveform',
+    description: 'Why “Save image as” often gives you a .webp or .avif file even when the address ends in .jpg, and simple ways to get a JPG or PNG instead.',
+    h1: 'Why do images save as WebP, and how do I get a JPG?',
+    lede: 'Websites increasingly send pictures as WebP or AVIF instead of JPG and PNG. Here is what is going on behind the scenes, why the file you save does not match the address, and how to get a format your other software can open.',
+    tool: { from: 'webp', to: 'jpg' },
+    toolTitle: 'Convert WebP or AVIF to JPG here',
+    related: ['how-to-save-webp-as-png', 'save-image-as-type-alternative'],
+    converters: ['webp-to-jpg', 'webp-to-png', 'avif-to-jpg', 'avif-to-png'],
+    body: (root) => `
+<h2>Smaller files mean faster pages</h2>
+<p>Images are usually the heaviest part of a web page. WebP, introduced by Google in 2010, typically produces noticeably smaller files than JPG at the same visual quality, and it supports transparency, which JPG does not. AVIF, based on the AV1 video codec, often goes further still. Smaller images load faster, cost the site less bandwidth and help with search rankings that reward quick pages, so large sites, shops, news outlets and content platforms have moved to them.</p>
+<p>Today every major browser can display WebP and AVIF. The trouble starts once the picture leaves the browser: some image editors, office suites, older operating systems, printing services and upload forms still reject them.</p>
+
+<h2>Why the address says .jpg but the file is WebP</h2>
+<p>When your browser asks for an image, it sends a short list of formats it understands, in a request header called <code>Accept</code>. A current browser includes <code>image/avif</code> and <code>image/webp</code> in that list. Many image servers and content delivery networks read the list and return the smallest format your browser supports, while keeping the same address. This is called <em>content negotiation</em>.</p>
+<p>So an image at <code>photo.jpg</code> may arrive as WebP. When you choose “Save image as…”, the browser stores the bytes it received, and depending on the browser and site you may end up with a file named <code>.webp</code>, or even a WebP file wrongly named <code>.jpg</code> that some programs then fail to open.</p>
+<p>Other sites convert images when they upload them and only ever store WebP. In both cases, there is no JPG sitting on the server waiting to be downloaded.</p>
+
+<h2>Is it something wrong with my browser?</h2>
+<p>No. The browser is doing what it is designed to do: show the picture as efficiently as possible. Chrome, Edge, Firefox and Safari all behave this way, and none of them currently offers a “save in this format” option in the right-click menu. Turning off WebP support is not a practical fix either; it is not a normal setting, it would make sites slower, and many sites would send AVIF instead.</p>
+
+<h2>How to get a JPG or PNG</h2>
+<ol class="steps-list">
+  <li><strong>Copy and paste.</strong> Right-click the image, choose <em>Copy image</em>, then paste it into the converter on this page with <kbd>Ctrl</kbd>+<kbd>V</kbd>. Pick JPG or PNG and download.</li>
+  <li><strong>Convert a saved file.</strong> Drop .webp or .avif files on the converter. It handles batches and downloads them as one ZIP. Dedicated pages: <a href="${root}webp-to-jpg/">WebP to JPG</a>, <a href="${root}webp-to-png/">WebP to PNG</a>, <a href="${root}avif-to-jpg/">AVIF to JPG</a>, <a href="${root}avif-to-png/">AVIF to PNG</a>.</li>
+  <li><strong>Change the image address.</strong> Some image services choose the format from a parameter in the address, such as <code>format=webp</code> or <code>fm=webp</code>. Opening the image in its own tab and changing or removing that parameter sometimes gives you a JPG or PNG. This only works where the site supports it.</li>
+  <li><strong>Use a right-click extension.</strong> An extension can add “Save as PNG / JPG” directly to the menu and convert on your device. The step-by-step guide on <a href="${root}how-to-save-webp-as-png/">saving WebP as PNG or JPG</a> compares the options.</li>
+</ol>
+
+<h2>Does converting lose quality?</h2>
+<p>Converting cannot add back detail that the site’s compression already removed, but it does not need to remove more. PNG is lossless, so a PNG made from a WebP looks exactly like the picture you saw. JPG at a quality around 90% is visually the same for photographs and keeps files small. If the image has transparent areas, choose PNG; JPG fills them with a solid colour.</p>
+
+<h2>Does converting expose my images?</h2>
+<p>Not with this site. The converter runs entirely in your browser tab using the browser’s own image decoder, so nothing is uploaded. That is worth checking with any online converter you use: many upload your file to a server to process it.</p>`,
+  },
+  {
+    slug: 'save-image-as-type-alternative',
+    footer: 'Replacing Save Image as Type',
+    title: 'Save Image as Type Was Removed: What to Use Instead | Saveform',
+    description: 'The popular Save Image as Type extension was removed from the Chrome Web Store as malware in March 2026. What happened, how to check a replacement, and safe options.',
+    h1: 'Looking for a replacement after Save Image as Type was removed?',
+    lede: 'For years, a free extension called Save Image as Type was the usual answer to “how do I save this WebP as a JPG?”. In March 2026 Google removed it as malware. Here is what happened, how to judge a replacement, and the options that need no extension at all.',
+    related: ['how-to-save-webp-as-png', 'why-images-save-as-webp'],
+    converters: ['webp-to-png', 'webp-to-jpg', 'avif-to-png', 'png-to-jpg'],
+    body: (root) => `
+<h2>What happened</h2>
+<p>Save Image as Type added “Save image as PNG / JPG / WebP” to Chrome’s right-click menu and had more than a million users. According to <a href="https://9to5google.com/2026/03/16/image-saving-chrome-extension-removed-as-malware/" rel="noopener">reporting by 9to5Google in March 2026</a> and other outlets, the extension had been sold to a new owner, later versions added behaviour that had nothing to do with saving images, such as interfering with shopping (affiliate) links, and Google disabled it in the Chrome Web Store as malware. Browsers that had it installed turned it off automatically.</p>
+<p>This pattern is not unique to one extension. Popular free extensions are attractive to buy precisely because they already have users and permissions; a new owner can push an update and every installed copy receives it silently. That is why the questions below matter more than a feature list.</p>
+
+<h2>Do you need an extension at all?</h2>
+<p>If you only convert an image now and then, you can skip extensions entirely:</p>
+<ul>
+  <li>Right-click the image, choose <strong>Copy image</strong>, and paste it into the <a href="${root}">converter on this site</a> with <kbd>Ctrl</kbd>+<kbd>V</kbd>. It converts in your browser tab; nothing is uploaded.</li>
+  <li>Or save the .webp or .avif file and drop it on <a href="${root}webp-to-png/">WebP to PNG</a> or <a href="${root}webp-to-jpg/">WebP to JPG</a>.</li>
+</ul>
+<p>The guide on <a href="${root}how-to-save-webp-as-png/">saving WebP images as PNG or JPG</a> covers these and the built-in apps on Windows and macOS.</p>
+
+<h2>How to check a replacement extension</h2>
+<p>If you save images often, a right-click extension is still the most convenient tool. Before installing one, spend two minutes on these checks:</p>
+<ol class="steps-list">
+  <li><strong>Permissions.</strong> Read the permissions on the store listing and in the install prompt. An image saver needs to read the image you clicked and write a download. “Read and change all your data on all websites” is far more than that requires, unless it is optional and asked for per site.</li>
+  <li><strong>Network access.</strong> Converting an image can be done entirely on your device. If the description mentions uploading images, cloud processing or an account, your pictures leave your computer.</li>
+  <li><strong>Open source.</strong> Public source code lets anyone check what the extension does, and makes a hidden change after a sale easier to spot.</li>
+  <li><strong>Extras you did not ask for.</strong> Coupons, shopping “deals”, search changes and new-tab takeovers in an image tool are a warning sign.</li>
+  <li><strong>Owner and update history.</strong> A sudden change of developer name or a burst of updates after a quiet period deserves a look at recent reviews.</li>
+</ol>
+<p>After installing, revisit the extension now and then on <code>chrome://extensions</code> (or <code>about:addons</code> in Firefox). An update that requests new permissions will prompt you; do not approve it without knowing why.</p>
+
+<h2>One option: Saveform</h2>
+<p>We built Saveform with these checks in mind, so here is how it measures up. It adds <em>Save as PNG / JPG / WebP</em> (and AVIF where the browser can create it) plus <em>Copy as PNG</em> to the right-click menu. Conversion happens on your device with the same code as this site’s converters; the only thing it downloads is the image you clicked, nothing is sent to any server of ours, there are no analytics and no account. The only install warning is “Manage your downloads”: it does not ask for access to the sites you visit, and requests access to a single image host only if that server blocks the download, which you can decline or revoke. The source code is public on <a href="https://github.com/janwan2003/save-image-format" rel="noopener">GitHub</a> under the MIT licence.</p>
+<p>It is new and does not have the history the old extension had, and its store listings are not live yet (the Firefox version is in Mozilla’s review queue, the Chrome version comes next). You can install it from source today; see <a href="${root}extension/">the extension page</a> for the steps and a plain-language explanation of every permission. Other image-saving extensions exist too; whichever you choose, the checks above apply.</p>`,
+  },
+];
