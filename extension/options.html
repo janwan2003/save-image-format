@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saveform settings</title>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<main>
+  <h1><img src="icons/icon48.png" alt="">Saveform settings</h1>
+  <p>Right-click any image, choose <b>Save image as</b>, then a format. Images are converted on this device; Saveform makes no other network requests and collects nothing.</p>
+
+  <h2>Saving</h2>
+  <label><input type="checkbox" id="askWhere"> Ask where to save each file (shows the Save dialog)</label>
+
+  <h2>Quality</h2>
+  <label>JPG <input type="range" id="jpgQuality" min="10" max="100"> <output for="jpgQuality"></output></label>
+  <label>WebP <input type="range" id="webpQuality" min="10" max="100"> <output for="webpQuality"></output></label>
+  <label id="avifRow">AVIF <input type="range" id="avifQuality" min="10" max="100"> <output for="avifQuality"></output></label>
+  <label>JPG background for transparent areas <input type="color" id="jpgBackground"></label>
+  <label>Render SVG images at least <input type="number" id="svgMinSize" min="0" max="8192" step="64" style="width:6em"> px on the long side</label>
+
+  <h2>Site access</h2>
+  <p>Some image servers block extensions from reading images. Saveform then asks for access to that one site. Sites you allowed:</p>
+  <div class="card"><ul class="sites" id="sites"></ul></div>
+  <p class="status" id="status" role="status"></p>
+  <p><small>Saveform <span id="version"></span> · open source · <a href="https://github.com/janwan2003/save-image-format" target="_blank" rel="noopener">source code</a></small></p>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saveform: allow access</title>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<main>
+  <h1><img src="icons/icon48.png" alt="">Allow Saveform to read this image?</h1>
+  <p>The server <span class="host" id="host">…</span> does not let browser extensions read its images unless you allow it.</p>
+  <p>If you allow it, Saveform can download images from that site only when you right-click one. It never reads pages, and nothing is sent anywhere. You can remove access any time in Saveform settings.</p>
+  <div class="row">
+    <button class="primary" id="allow-site">Allow for this site</button>
+    <button id="allow-all">Allow for all sites</button>
+    <button id="cancel">Cancel</button>
+  </div>
+  <p class="status" id="status" role="status"></p>
+</main>
+<script type="module" src="grant.js"></script>
+</body>
+</html>
