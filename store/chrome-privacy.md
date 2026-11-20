@@ -1,8 +1,8 @@
 # Chrome Web Store dashboard: what to paste (Saveform)
 
-Item id: `iimmananoageikphanfidapckaochlmn` (draft; package 0.3.0 uploaded by `scripts/cws-upload.py` on 2026-11-20.
-The text below already describes 0.4.0, which adds the toolbar button that saves several images from a page;
-upload 0.4.0 with `python3 scripts/cws-upload.py` before or after filling the dashboard, the text fits both).
+Item id: `iimmananoageikphanfidapckaochlmn` (draft; package 0.4.0 uploaded by `scripts/cws-upload.py` on 2026-11-20,
+`--status` reports crxVersion 0.4.0). 0.4.0 adds the toolbar button that saves several images from a page; the text
+below covers it.
 Dashboard: https://chrome.google.com/webstore/devconsole → click "Saveform: Save Image as PNG, JPG, WebP, PDF".
 
 The publish call (`python3 scripts/cws-upload.py --publish`, 2026-11-20) listed exactly these missing items.

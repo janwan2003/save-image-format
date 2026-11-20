@@ -68,6 +68,8 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
   network calls, no analytics in the extension. Store builds are reproducible from tagged
   source. The listing and site say all of this in plain words, which is exactly what
   the incumbent got wrong.
+- **Save every image on a page** (0.4.0): grid picker, files / ZIP / one PDF, largest srcset version, CSS backgrounds.
+  None of the competitors in the table above advertises this in its listing name (checked only by name, not by installing them).
 - **More formats than the 400K leader:** PNG, JPG (with quality), WebP, AVIF, and
   "copy as PNG to clipboard". Also handles AVIF/JXL sources where the browser can decode
   them.
@@ -80,10 +82,17 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
 
 Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Format" is an existing listing, so not used).
 
-**Extension** (`extension/`, MV3, no build step, no dependencies, v0.3.0):
+**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.0):
 - Right-click image → Save image as → PNG / JPG / WebP / PDF (AVIF only where the browser's canvas can
   write it; Chrome 159 cannot, so not shown there) / Copy as PNG. PDF (added in v0.2.0) = one page, page size
   set in settings (same as image by default, or A4 / US Letter), JPEG quality shared with JPG.
+- **Save all images on a page (v0.4.0, session 5):** toolbar button / Alt+Shift+S opens a popup (`popup.html/js/css`) that
+  lists the page's images (`lib/collect.js`: `<img>` with the largest `srcset` w-candidate, SVG `<image>`, video posters, CSS
+  backgrounds; up to 500), with a size filter (default: hide < 100 px), select all/none, format PNG/JPG/WebP/(AVIF)/original,
+  output separate files / one ZIP / one PDF. The batch runs in the background (`startBatch`/`continueBatch` in `background.js`)
+  so it survives the popup closing; sites that refuse extension reads are listed once with Allow / Skip so a ZIP or PDF stays
+  one file (Firefox: `permissions.onAdded` continues the batch if the popup closed during the prompt). Shared code moved to
+  `lib/fetch.js` and `lib/zip.js` (the site imports `lib/zip.js` too). Popup previews load the image URLs with no referrer.
 - PDF and ICO are written by our own code (`extension/lib/pdf.js`, `makeIco` in `extension/lib/convert.js`):
   PDF 1.4 with JPEG (DCTDecode) or, at 100% quality, lossless zlib RGB (FlateDecode) pages; ICO with PNG entries.
 - Fetch order: extension fetch (works for CORS-enabled CDNs and the page's own site via activeTab) →
@@ -92,8 +101,8 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
   settings page (quality, Save dialog on/off, file name pattern, Downloads subfolder, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.3.0-chrome.zip` and
-  `packages/saveform-0.3.0-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.0-chrome.zip` and
+  `packages/saveform-0.4.0-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
   offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
@@ -102,11 +111,13 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   superseded unreviewed 0.1.0 file is now `disabled`). The first attempt got HTTP 429 (throttled ~45 min); the retry worked.
   `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
 - **Chrome Web Store: uploaded as a draft, waiting for the operator.** The API works since 2026-11-20 (session 4):
-  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.3.0 uploaded (`uploadState: SUCCESS`).
+  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.0 uploaded in session 5 (`--status`: crxVersion 0.4.0).
   `cws-upload.py --publish` returns 400 listing exactly what the dashboard still needs (contact email + verification,
   language, category, icon, screenshot, description, Privacy practices). Text and files for every field: `store/chrome-privacy.md` (inbox line filed).
 - **AMO v0.3.0 submitted 2026-11-20** (version id 6737975, file `unreviewed`; 0.2.0 file now `disabled`). The listing-text PATCH
   that follows was throttled (429, ~23 h); retry with `python3 scripts/amo-submit.py --listing`.
+- **AMO v0.4.0 NOT yet submitted:** upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
+  (≈ 2026-11-21 12:25 UTC). Re-run `python3 scripts/amo-submit.py` (it adds the version and PATCHes the new listing text).
 - **v0.3.0 (session 4):** settings for a file name pattern (`{name}`, `{site}`, `{date}`, `{time}`, `{width}`, `{height}`;
   default `{name}`) and a folder inside Downloads (`buildFilename()` in `extension/lib/filename.js`; separators, `..` and
   reserved names are cleaned).
@@ -115,14 +126,16 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   site root. `scripts/indexnow.py` pushes every sitemap URL to IndexNow (Bing, Yandex, Seznam, Naver; no account).
   the Chrome Web Store API is not enabled in the operator's Google Cloud project (inbox request filed 2026-11-20).
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 27 converter pages (index,
+**Website** (live, https://janwan2003.github.io/save-image-format/): 30 converter pages (png/jpg/webp→gif added in session 5, with
+our own GIF89a encoder `extension/lib/gif.js`: median-cut palette, optional Floyd–Steinberg dithering, 1-bit transparency, LZW; GIF
+is also on the index format menu, not in the extension menu) (index,
 webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
 jfif→jpg/png, image→pdf, favicon generator),
 3 guides (/how-to-save-webp-as-png/, /why-images-save-as-webp/, /save-image-as-type-alternative/), plus privacy, extension and 404 pages;
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 32 URLs. Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 35 URLs. Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -161,7 +174,23 @@ IndexNow key return 200; live /favicon-generator/ in headless Chromium wrote `lo
 Visual check: settings page screenshot (light) looked right; the subagent checked /favicon-generator/ (light) and /image-to-pdf/
 (390 px, dark).
 
-**Not verified:** the new settings in real Chrome with a real menu click (Playwright saves under GUID names, so the
+**Verified (2026-11-20, session 5):** `npm test` 65/65 locally and in GitHub Actions run 44748850979 (0 skipped; Chromium +
+Firefox) on commit baa719a. New: `tests/batch.test.mjs` (collector finds `<img>`, largest srcset candidate incl. a URL with a comma,
+SVG, CSS background; ZIP of 4 PNGs with sizes checked and the non-CORS CDN image asking for access then skipped; one 3-page PDF;
+original-format files byte-identical; the popup lists 6 images, hides the 1×1, saves 2 as JPG and remembers the choice), a Firefox
+case (ZIP of 3 PNGs from the event page, read back from disk), `tests/gif.test.mjs` (7 encoder cases decoded by Chromium and an
+independent reader, incl. LZW table resets) and 4 GIF site tests (subagent). Field check `scripts/real-sites-batch.mjs` on 10 real
+sites (Chromium, ZIP of up to 12 PNGs each): Wikipedia 6/6, BBC 12/12, Guardian 11/11, IKEA 12/12, NASA 12/12, Flickr 12/12,
+Dribbble 11/12 (1 site blocked extension reads → skipped), Shopify 12/12; Unsplash listed 0 images and Pexels 1 (headless page,
+as in the earlier field test). Popup screenshot looked right after fixing a grid overflow. `web-ext lint` on the 0.4.0 Firefox zip:
+0 errors, 1 warning (offscreen). Live after Pages run 44748850990: the 3 GIF pages, `/lib/gif.js`, `/lib/zip.js`, `/privacy/`
+(mentions the toolbar list), `/extension/` return 200; sitemap 35 <loc>; live /webp-to-gif/ in headless Chromium wrote
+`grad.gif` (GIF89a, 120×80, transparent half kept), 0 console errors, no requests outside github.io.
+
+**Not verified:** the popup opened by a real toolbar click and the real Chrome/Firefox permission prompt from the popup (tests
+open popup.html?tabId= in a tab and pre-grant the page origin); Firefox closing the popup during the prompt (the onAdded path is
+untested); very large batches (memory: all fetched blobs are held until saving; a ZIP is passed to downloads as a data: URL in
+Chrome, checked only up to 10 MB); GIF files opened outside Chromium; the new settings in real Chrome with a real menu click (Playwright saves under GUID names, so the
 on-disk subfolder was only checked in Firefox); the favicon pages' general claims (browsers request /favicon.ico by default,
 favicon caching) are from general knowledge, not checked against browser docs. Firefox with a real context-menu click and the real per-site permission prompt, the real Chrome permission prompt (cannot be
 automated; the test pre-grants access), logged-in sites (Instagram, X, Facebook), images in
@@ -171,29 +200,37 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
 ## Next steps
 
 1. **Operator:** fill the Chrome Web Store dashboard for draft item `iimmananoageikphanfidapckaochlmn` (every field's text and
-   file in `store/chrome-privacy.md`; inbox line 2026-11-20). Then run `python3 scripts/cws-upload.py --publish`; the reply
-   lists anything still missing. Afterwards: CWS link on `site/content/extension.html` and in `calloutHtml()`.
-2. Retry the AMO listing text after the throttle ends (~2026-11-21 13:40 UTC): `python3 scripts/amo-submit.py --listing`.
-   Check the review (`--status`); when approved, add the AMO link to the site as in step 1 and start AMO metrics.
+   file in `store/chrome-privacy.md`, updated for 0.4.0; inbox line 2026-11-20). Then run `python3 scripts/cws-upload.py --publish`;
+   the reply lists anything still missing. Afterwards: CWS link on `site/content/extension.html` and in `calloutHtml()`.
+2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.0 and PATCHes the listing text; if the listing PATCH is
+   throttled again, `--listing` later). Check the review (`--status`); when approved, add the AMO link to the site and start AMO metrics.
 3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
    put effort into the page types that get impressions. Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
-4. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
-5. Features: "save all images on page" (premium candidate), keyboard shortcut; Firefox-only "Save background image"
-   via `menus.getTargetElement` (Chrome has no equivalent without all-sites access, which we refuse).
-6. More search pages: heic→jpg/png (largest volume; needs a WASM decoder: `libheif-js` 1.23.5 is LGPL-3.0, 9 MB unpacked, and
+4. New store screenshot showing the save-all popup (`docs/store/`, made by `scripts/store-assets.mjs`) and upload it with the
+   listing; the popup is the clearest difference from the 400K-user PNG-only competitor.
+5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
+6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
+   lazy-loaded images (`data-src`) that have not loaded yet, images inside same-origin iframes.
+7. More search pages: heic→jpg/png (largest volume; needs a WASM decoder: `libheif-js` 1.23.5 is LGPL-3.0, 9 MB unpacked, and
    no HEIC encoder exists on this machine for a test fixture: ImageMagick here reads HEIC but cannot write it, so a public
-   sample with a clear licence is needed), avif→webp (needs an AVIF fixture), webp→gif (needs our own GIF encoder),
-   "save image as jpg in firefox/edge" guides. Check the guides' unsourced claims (macOS Preview export, CDN `format=`/`fm=`).
+   sample with a clear licence is needed), avif→webp (needs an AVIF fixture), "save image as jpg in
+   firefox/edge" guides, a "download all images from a page" guide pointing at the popup. Check the guides' unsourced claims
+   (macOS Preview export, CDN `format=`/`fm=`).
+8. Features: Firefox-only "Save background image" via `menus.getTargetElement` (Chrome has no equivalent without all-sites
+   access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
 
+- 2026-11-20 (session 5): no users yet (AMO `nominated`, `--status`; CWS draft, `cws-upload.py --status`). GSC data not
+  expected before ~2026-12-04; not queried this session.
 - 2026-11-20 (session 4): Search Console property added today; `gsc.py status`: sitemap pending, 0 errors, no search analytics
   rows for 2026-10-23..2026-11-20. AMO: `nominated`, not public (`amo-submit.py --status`). CWS: draft, not public. No users yet.
 
 ## Monetization plan
 
-None until the operator enables it (charter rule 4). Later options: optional paid "pro"
-batch mode (save every image on a page, resize/rename rules), or donations. Do **not**
+None until the operator enables it (charter rule 4). Save-all shipped free in 0.4.0 (it is the feature that sets us
+apart from the clones, so it should stay free while we grow users). Later "pro" options: resize/rename rules on batch saves,
+saving from every open tab, scheduled/auto-save rules; or donations. Do **not**
 inject affiliate links: that is the exact behaviour that got the incumbent removed.
 The site's converter pages could later carry one unobtrusive ad slot.
 
@@ -223,3 +260,8 @@ The site's converter pages could later carry one unobtrusive ad slot.
   file name pattern + Downloads subfolder (AMO version 6737975 submitted; listing-text PATCH throttled); 5 new pages
   (image→pdf, favicon generator, jpg/svg/webp→ico; sitemap 27 → 32). Evidence: Actions run 44746561369 48/48, Pages run
   44746561233, live favicon/image-to-pdf conversions, web-ext lint 0 errors.
+- 2026-11-20 builder (session 5): v0.4.0 "save all images on a page" (toolbar popup, Alt+Shift+S; files / ZIP / one PDF; original
+  format option; allow-or-skip for blocking sites) + GIF output and 3 GIF pages via a subagent (own encoder; sitemap 32 → 35).
+  CWS draft updated to 0.4.0; AMO 0.4.0 validated but throttled (retry ≥ 2026-11-21 12:30 UTC); IndexNow 35 URLs (HTTP 200),
+  sitemap resubmitted (204). Evidence: Actions run 44748850979 65/65, Pages run 44748850990, live webp→gif conversion, field
+  check on 10 real sites (8 saved, 2 headless-blank), web-ext lint 0 errors.
