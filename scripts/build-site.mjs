@@ -5,7 +5,7 @@
 // (privacy, extension, 404), all rendered through site/template.html.
 // The conversion engine is copied from extension/lib so the site and the
 // extension run the exact same code.
-import { mkdir, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, copyFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { converters, SITE_URL, REPO_URL, FORMAT_LABEL } from '../site/pages.mjs';
@@ -337,6 +337,10 @@ async function main() {
     copyFile(join(ROOT, 'extension/lib/pdf.js'), join(DIST, 'lib/pdf.js')),
   ]);
   await writeFile(join(DIST, '.nojekyll'), '');
+  // Search Console ownership files (scripts/gsc.py token), served from the site root.
+  for (const f of await readdir(join(SITE, 'verify')).catch(() => [])) {
+    await copyFile(join(SITE, 'verify', f), join(DIST, f));
+  }
 
   // Search engine files.
   const indexable = [...converters.map((p) => p.slug), ...guides.map((g) => g.slug), 'extension', 'privacy'];

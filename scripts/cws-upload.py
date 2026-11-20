@@ -6,7 +6,7 @@ With an id: uploads a new package to that item. Publishing needs the listing (sc
 category, privacy answers) filled in the developer dashboard first; pass --publish after that.
 Credentials: CWS_CLIENT_ID / CWS_CLIENT_SECRET / CWS_REFRESH_TOKEN from the studio .env (never printed).
 """
-import json, sys, urllib.error, urllib.parse, urllib.request
+import json, sys, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -17,7 +17,13 @@ ID_FILE = ROOT / "store" / "cws-item-id.txt"
 def token():
     data = urllib.parse.urlencode(dict(client_id=ENV["CWS_CLIENT_ID"], client_secret=ENV["CWS_CLIENT_SECRET"],
                                        refresh_token=ENV["CWS_REFRESH_TOKEN"], grant_type="refresh_token")).encode()
-    return json.load(urllib.request.urlopen("https://oauth2.googleapis.com/token", data))["access_token"]
+    for attempt in range(4):  # the token endpoint sometimes answers 503
+        try:
+            return json.load(urllib.request.urlopen("https://oauth2.googleapis.com/token", data))["access_token"]
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or attempt == 3:
+                raise
+            time.sleep(3 * (attempt + 1))
 
 
 def call(method, url, body=None, ctype=None):
