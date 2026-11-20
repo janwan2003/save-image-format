@@ -305,4 +305,4 @@ The site's converter pages could later carry one unobtrusive ad slot.
   /heic-to-png/, /heic-to-pdf/ and a "open HEIC on Windows" guide (sitemap 35 → 39); own HEIF writer for test fixtures; Firefox site
   test; save-all finds lazy-loaded images (subagent) → v0.4.1 uploaded to the CWS draft (AMO throttled until 2026-11-21);
   `cws-upload.py --status` no longer needs the zip. Evidence: Actions runs 44750918433 (69/69) and 44751383003 (72/72), local 74/74,
-  Pages runs 44750918167/44751383097, live HEIC conversion (434 ms, github.io only), IndexNow 39 URLs, web-ext lint 0 errors.
+  final run 44752096360 on 8b78cbc 74/74 (0 skipped), Pages runs 44750918167/44751383097/44752096446, live HEIC conversion (434 ms, github.io only), IndexNow 39 URLs, web-ext lint 0 errors.
