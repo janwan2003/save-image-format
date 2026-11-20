@@ -164,6 +164,9 @@ output { min-width: 3.2em; font-variant-numeric: tabular-nums; }
 .footer-links { display: flex; gap: 4px 18px; flex-wrap: wrap; }
 
 @media (max-width: 560px) {
+  /* Four nav links must fit one row at 390 px, even with wide fallback fonts (DejaVu Sans). */
+  .site-header nav { gap: 0; }
+  .site-header nav a { padding: 6px 7px; font-size: 0.94rem; }
   .tool { padding: 12px; }
   .result { grid-template-columns: 52px 1fr; }
   .thumb { width: 52px; height: 52px; }
