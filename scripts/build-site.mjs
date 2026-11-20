@@ -178,7 +178,7 @@ function calloutHtml(root, logo) {
   ${logo}
   <div>
     <h2 id="ext-callout">Skip the converter next time</h2>
-    <p>The free Saveform browser extension adds <strong>Save as PNG / JPG / WebP / PDF</strong> to the right-click menu on any image on the web. Same local conversion, no upload, no tracking.</p>
+    <p>The free Saveform browser extension adds <strong>Save as PNG / JPG / WebP / PDF</strong> to the right-click menu on any image on the web, and saves every image on a page at once as files, a ZIP or one PDF. Same local conversion, no upload, no tracking.</p>
     <a class="btn" href="${root}extension/">Get the extension</a>
   </div>
 </aside>`;
@@ -332,7 +332,7 @@ async function main() {
   await Promise.all([
     copyFile(join(SITE, 'assets/style.css'), join(DIST, 'assets/style.css')),
     copyFile(join(SITE, 'assets/app.js'), join(DIST, 'assets/app.js')),
-    copyFile(join(SITE, 'assets/zip.js'), join(DIST, 'assets/zip.js')),
+    copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
     copyFile(join(SITE, 'og-image.png'), join(DIST, 'og-image.png')),
     copyFile(join(ROOT, 'extension/lib/convert.js'), join(DIST, 'lib/convert.js')),

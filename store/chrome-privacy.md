@@ -1,6 +1,8 @@
 # Chrome Web Store dashboard: what to paste (Saveform)
 
-Item id: `iimmananoageikphanfidapckaochlmn` (draft, package 0.2.0 uploaded by `scripts/cws-upload.py` on 2026-11-20).
+Item id: `iimmananoageikphanfidapckaochlmn` (draft; package 0.3.0 uploaded by `scripts/cws-upload.py` on 2026-11-20.
+The text below already describes 0.4.0, which adds the toolbar button that saves several images from a page;
+upload 0.4.0 with `python3 scripts/cws-upload.py` before or after filling the dashboard, the text fits both).
 Dashboard: https://chrome.google.com/webstore/devconsole → click "Saveform: Save Image as PNG, JPG, WebP, PDF".
 
 The publish call (`python3 scripts/cws-upload.py --publish`, 2026-11-20) listed exactly these missing items.
@@ -28,18 +30,19 @@ Fill them once; after that, updates and publishing go through the API.
 
 **Single purpose description:**
 
-> Saveform adds a "Save image as" entry to the right-click menu for images, which saves the image in a format the
-> user picks (PNG, JPG, WebP, PDF) or copies it as PNG. The conversion runs on the user's device.
+> Saveform saves images from web pages in a format the user picks (PNG, JPG, WebP, PDF). It adds a "Save image as"
+> entry to the right-click menu for one image, and a toolbar button that lists the images on the current page so the
+> user can save several at once (as separate files, one ZIP or one PDF). The conversion runs on the user's device.
 
 **Permission justifications** (one box each):
 
 - **contextMenus:** Adds the "Save image as → PNG / JPG / WebP / PDF / Copy as PNG" submenu when the user right-clicks an image.
 - **downloads:** Saves the converted image file to the user's downloads folder (optionally with the Save As dialog).
-- **activeTab:** After the user clicks a Saveform menu entry, reads the right-clicked image from the current site so it can be converted. No access to any page otherwise.
-- **scripting:** Runs a short script in the current tab only after a menu click: to read images that exist only inside the page (blob: URLs or images that need the page's cookies), to copy the converted PNG to the clipboard, and to show a brief "Saved" or error notice.
-- **storage:** Stores the user's settings (JPG/WebP/PDF quality, PDF page size, background colour, whether to show the Save dialog, file name pattern, Downloads subfolder).
+- **activeTab:** After the user clicks a Saveform menu entry or the Saveform toolbar button, reads the image(s) from the current site so they can be converted. No access to any page otherwise.
+- **scripting:** Runs a short script in the current tab only after the user clicks a Saveform menu entry or the toolbar button: to list the addresses and sizes of the images on the page (toolbar button), to read images that exist only inside the page (blob: URLs or images that need the page's cookies), to copy the converted PNG to the clipboard, and to show a brief "Saved" or error notice.
+- **storage:** Stores the user's settings (JPG/WebP/PDF quality, PDF page size, background colour, whether to show the Save dialog, file name pattern, Downloads subfolder, and the format/output last chosen in the toolbar popup).
 - **offscreen:** Renders SVG images to a canvas in an offscreen document, because the extension service worker cannot decode SVG.
-- **Host permission (optional, `<all_urls>`):** Never granted at install. Requested for one site at a time, only when an image server refuses to let the extension read the image, and only after the user clicks "Allow" on Saveform's prompt. The user can revoke it in Saveform's settings.
+- **Host permission (optional, `<all_urls>`):** Never granted at install. Requested only for the specific image sites that refuse to let the extension read an image the user asked to save, and only after the user clicks "Allow" on Saveform's prompt. The user can revoke it in Saveform's settings.
 
 **Are you using remote code?** No, I am not using remote code. (All JavaScript is in the package; no eval, no external scripts.)
 

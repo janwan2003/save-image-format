@@ -1,15 +1,16 @@
 # Saveform: save any image as PNG, JPG, WebP or PDF
 
 Right-click an image → **Save image as** → **PNG / JPG / WebP / PDF** (and **AVIF** in browsers that can
-write it), or **Copy as PNG**. The conversion happens on your device, inside the browser.
+write it), or **Copy as PNG**. Or click the toolbar button (Alt+Shift+S) to see every image on the page and save
+the ones you pick as separate files, one ZIP or one PDF. The conversion happens on your device, inside the browser.
 
 Website with free in-browser converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO, …):
 https://janwan2003.github.io/save-image-format/
 
 ## Why trust it
 
-- **No network calls of its own.** The only request Saveform makes is fetching the image you
-  right-clicked. There is no analytics, no remote code, no server and no account.
+- **No network calls of its own.** The only requests Saveform makes are for the images you
+  ask it to save (and, in the toolbar popup, their previews). There is no analytics, no remote code, no server and no account.
 - **Minimal permissions.** It has no access to the pages you visit. On install it asks only for
   "Manage your downloads". Some image servers block extensions from reading images; only then does Saveform
   ask for access to that **one** site, and you can revoke it in settings.
@@ -24,8 +25,8 @@ https://janwan2003.github.io/save-image-format/
 |---|---|
 | `contextMenus` | adds the "Save image as" entry to the right-click menu |
 | `downloads` | saves the converted file |
-| `activeTab` | when you click the menu, lets Saveform read that one image from the current site |
-| `scripting` | reads `blob:` images from inside the page, shows a short notice, and copies to the clipboard |
+| `activeTab` | when you click the menu or the toolbar button, lets Saveform read the current site's images |
+| `scripting` | lists the page's images (toolbar button), reads `blob:` images from inside the page, shows a short notice, copies to the clipboard |
 | `storage` | remembers your settings (quality, Save dialog, file name pattern, folder) |
 | `offscreen` | Chrome only: renders SVG images, which the background worker cannot draw |
 | optional host access | asked per site, only when an image server blocks cross-site reads |

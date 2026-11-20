@@ -16,10 +16,11 @@
 <h2>The browser extension</h2>
 <ul>
   <li>When you choose a Saveform entry in the right-click menu, the extension reads the one image you clicked, converts it on your computer and hands the result to your browser’s normal download system.</li>
-  <li>To read that image, the extension fetches it from the address the page already uses for it. It makes no other network requests: no analytics, no update pings of its own, no remote code.</li>
-  <li>Some image servers block other sites from reading their images. Only in that case does the extension ask for permission to access that particular site. You can decline, and you can remove a granted permission at any time on the browser’s extensions page.</li>
+  <li>When you click the Saveform button in the toolbar, the extension lists the images on the page you are viewing (their addresses and sizes) to show them to you. That list stays in the extension window and is discarded when it closes. Only the images you then choose to save are downloaded and converted.</li>
+  <li>To read an image, the extension fetches it from the address the page already uses for it. The previews in the toolbar window are loaded from those same addresses, without sending a referrer. It makes no other network requests: no analytics, no update pings of its own, no remote code.</li>
+  <li>Some image servers block other sites from reading their images. Only in that case does the extension ask for permission to access that particular site (or, when you save several images, those particular sites). You can decline, and you can remove a granted permission at any time on the browser’s extensions page.</li>
   <li>Your settings (for example the JPG quality you prefer) are stored by the browser on your device. They are not sent anywhere.</li>
-  <li>The extension does not read your browsing history, the content of pages you visit, or anything other than the image you asked it to save.</li>
+  <li>The extension does not read your browsing history, the content of pages you visit, or anything other than the images on the page you asked it to save from.</li>
 </ul>
 <p>Each permission the extension requests is explained in plain words on the <a href="{{root}}extension/">extension page</a>.</p>
 

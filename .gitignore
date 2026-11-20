@@ -6,3 +6,5 @@ test-results/
 tmp-firefox-test-*/
 packages/
 __pycache__/
+tests/.popup.png
+.claude/

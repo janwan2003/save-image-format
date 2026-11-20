@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Saveform</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body class="popup">
+<header>
+  <img src="icons/icon32.png" alt="" width="20" height="20">
+  <strong>Save images from this page</strong>
+  <a href="#" id="settings" class="settings" title="Saveform settings">Settings</a>
+</header>
+<p id="message" class="message" role="status"></p>
+<section id="picker" hidden>
+  <div class="bar">
+    <span id="count"></span>
+    <label class="inline">Hide smaller than
+      <select id="minSize">
+        <option value="0">show all</option>
+        <option value="50">50 px</option>
+        <option value="100">100 px</option>
+        <option value="200">200 px</option>
+        <option value="400">400 px</option>
+      </select>
+    </label>
+    <button type="button" id="toggleAll" class="link">Select none</button>
+  </div>
+  <ul id="grid" class="grid"></ul>
+  <footer>
+    <label class="inline">Format
+      <select id="format">
+        <option value="png">PNG</option>
+        <option value="jpg">JPG</option>
+        <option value="webp">WebP</option>
+        <option value="avif" id="avifOption">AVIF</option>
+        <option value="original">Original format</option>
+      </select>
+    </label>
+    <label class="inline">As
+      <select id="output">
+        <option value="files">separate files</option>
+        <option value="zip">one ZIP file</option>
+        <option value="pdf">one PDF</option>
+      </select>
+    </label>
+    <button type="button" id="save" class="primary">Save</button>
+  </footer>
+</section>
+<section id="progress" hidden>
+  <progress id="bar" max="1" value="0"></progress>
+  <p id="progressText" role="status"></p>
+  <div id="permission" hidden>
+    <p>These sites do not let extensions read their images unless you allow it:</p>
+    <ul id="origins" class="origins"></ul>
+    <div class="row">
+      <button type="button" id="allow" class="primary">Allow these sites</button>
+      <button type="button" id="skip">Skip those images</button>
+    </div>
+    <p class="hint">Access is used only when you save images, and you can remove it any time in Saveform settings.</p>
+  </div>
+  <details id="failures" hidden><summary></summary><ul id="failList"></ul></details>
+  <div class="row" id="doneRow" hidden><button type="button" id="again">Back to the image list</button></div>
+</section>
+<script type="module" src="popup.js"></script>
+</body>
+</html>

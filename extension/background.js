@@ -1,8 +1,12 @@
 // Saveform background (Chrome: MV3 service worker; Firefox: event page).
 // Flow: context-menu click -> fetch the image bytes -> convert locally -> download or copy.
-import { FORMATS, convertBlob, canEncode } from './lib/convert.js';
+import { FORMATS, convertBlob, canEncode, sniffType } from './lib/convert.js';
+import { makePdf } from './lib/pdf.js';
+import { makeZip } from './lib/zip.js';
+import { collectPageImages } from './lib/collect.js';
 import { buildFilename } from './lib/filename.js';
 import { getSettings, optionsFor } from './lib/settings.js';
+import { fetchImage, errorWith, dataUrlToBlob, blobToDataUrl } from './lib/fetch.js';
 
 const PARENT = 'saveform';
 const menuIds = [];
@@ -27,13 +31,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   handleClick(info, tab);
 });
 
-chrome.action?.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'saveform:run-job' && sender.id === chrome.runtime.id) {
     runPendingJob(msg.id).then(sendResponse, (e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
+  if (sender.id !== chrome.runtime.id) return false;
+  if (msg?.type === 'saveform:batch-start') { sendResponse(startBatch(msg.request)); return false; }
+  if (msg?.type === 'saveform:batch-continue') { continueBatch({ skip: !!msg.skip }); sendResponse(batchState()); return false; }
+  if (msg?.type === 'saveform:batch-get') { sendResponse(batchState()); return false; }
   return false;
 });
 
@@ -80,96 +87,6 @@ export async function runJob(job, { allowGrant = false } = {}) {
   });
   const downloadId = await saveBlob(out.blob, filename, settings.askWhere);
   return { ok: true, downloadId, filename, width: out.width, height: out.height, bytes: out.blob.size, type: out.blob.type };
-}
-
-// ---------- fetching ----------
-
-function errorWith(message, extra) { return Object.assign(new Error(message), extra); }
-
-export async function fetchImage(job) {
-  const url = job.src;
-  if (!url) throw errorWith('This image has no address Saveform can read.');
-  if (url.startsWith('data:')) return dataUrlToBlob(url);
-  if (url.startsWith('blob:')) return fetchInPage(job);
-  let parsed;
-  try { parsed = new URL(url); } catch { throw errorWith('This image address is not valid.'); }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    // file:// and others: only the page itself might be able to read it.
-    return fetchInPage(job);
-  }
-  let status = 0;
-  // 1. From the extension. Works when the server allows cross-site reads (many CDNs do),
-  //    when the image is on the page's own site (activeTab), or when per-site access was granted.
-  try {
-    const r = await fetch(url, { cache: 'force-cache', credentials: 'include' });
-    if (r.ok) return await r.blob();
-    status = r.status;
-  } catch { /* CORS refusal or network error; try the page next */ }
-  try {
-    const r = await fetch(url, { cache: 'force-cache' });
-    if (r.ok) return await r.blob();
-    status = r.status;
-  } catch { /* fall through */ }
-  // 2. From inside the page: same cookies and referrer as the page itself.
-  try { return await fetchInPage(job); } catch { /* fall through */ }
-  // 3. Ask for read access to just this image's site.
-  const origin = `${parsed.origin}/*`;
-  let granted = false;
-  try { granted = await chrome.permissions.contains({ origins: [origin] }); } catch { /* ignore */ }
-  if (!granted) throw errorWith('needs permission', { code: 'needs-permission', origin });
-  throw errorWith(status ? `The image server refused the download (HTTP ${status}).` : 'The image could not be downloaded (network error).');
-}
-
-export async function fetchInPage(job) {
-  if (job.tabId == null || job.tabId < 0) throw errorWith('No page to read the image from.');
-  const [res] = await chrome.scripting.executeScript({
-    target: { tabId: job.tabId, frameIds: [job.frameId || 0] },
-    func: pageFetchAsDataUrl,
-    args: [job.src],
-  });
-  const r = res?.result;
-  if (!r || !r.ok) throw errorWith(r?.error || 'The page could not read the image.');
-  return dataUrlToBlob(r.dataUrl);
-}
-
-// Injected into the page. Must be self-contained.
-async function pageFetchAsDataUrl(src) {
-  try {
-    const resp = await fetch(src, { credentials: 'include' });
-    if (!resp.ok) return { ok: false, error: `HTTP ${resp.status}` };
-    const blob = await resp.blob();
-    const dataUrl = await new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(fr.result);
-      fr.onerror = () => reject(fr.error);
-      fr.readAsDataURL(blob);
-    });
-    return { ok: true, dataUrl };
-  } catch (e) {
-    return { ok: false, error: String(e && e.message || e) };
-  }
-}
-
-function dataUrlToBlob(dataUrl) {
-  const comma = dataUrl.indexOf(',');
-  if (comma < 0) throw errorWith('Malformed data URL.');
-  const meta = dataUrl.slice(5, comma);
-  const body = dataUrl.slice(comma + 1);
-  const type = meta.split(';')[0] || 'application/octet-stream';
-  if (/;base64/i.test(meta)) {
-    const bin = atob(body);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new Blob([bytes], { type });
-  }
-  return new Blob([decodeURIComponent(body)], { type });
-}
-
-async function blobToDataUrl(blob) {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return `data:${blob.type || 'application/octet-stream'};base64,${btoa(bin)}`;
 }
 
 // ---------- converting ----------
@@ -278,6 +195,172 @@ function pageToast(message, kind) {
   setTimeout(() => host.remove(), kind === 'error' ? 6000 : 2500);
 }
 
+// ---------- save all images (toolbar popup) ----------
+// The popup lists the page's images and sends the chosen ones here, so the work goes on
+// even if the popup closes (it closes when it loses focus, e.g. when a download starts).
+// Phase 1 fetches every image; if some sites refuse, the batch waits for the user to allow
+// those sites (or skip them), so a ZIP or PDF still comes out as one file.
+
+let batch = null;
+
+function batchState() {
+  if (!batch) return { status: 'idle' };
+  const { id, status, total, fetched, done, saved, failed, origins, output, fmt, filename, error, downloadIds } = batch;
+  return { id, status, total, fetched, done, saved, failed: failed.slice(0, 50), failedCount: failed.length, origins, output, fmt, filename, error, downloadIds };
+}
+
+function broadcast() {
+  chrome.runtime.sendMessage({ type: 'saveform:batch-state', state: batchState() }).catch(() => { /* popup closed */ });
+}
+
+const EXT_OF = { png: 'png', jpeg: 'jpg', gif: 'gif', webp: 'webp', avif: 'avif', bmp: 'bmp', ico: 'ico', svg: 'svg', heic: 'heic', jxl: 'jxl' };
+
+export function startBatch(request) {
+  if (batch && (batch.status === 'fetching' || batch.status === 'saving')) return { ok: false, error: 'Saveform is still saving the previous set of images.' };
+  const items = (request?.items || []).filter((it) => it && typeof it.src === 'string').slice(0, 500);
+  if (!items.length) return { ok: false, error: 'No images selected.' };
+  const output = ['files', 'zip', 'pdf'].includes(request.output) ? request.output : 'files';
+  const fmt = request.fmt === 'original' || FORMATS[request.fmt] ? request.fmt : 'png';
+  batch = {
+    id: crypto.randomUUID(), status: 'fetching', items, output, fmt,
+    tabId: request.tabId ?? -1, pageUrl: request.pageUrl || '',
+    total: items.length, fetched: 0, done: 0, saved: 0, failed: [], origins: [], downloadIds: [], blobs: new Array(items.length), blocked: [],
+  };
+  runBatchFetch(batch).catch((e) => { batch.status = 'error'; batch.error = e.message; broadcast(); });
+  return { ok: true, state: batchState() };
+}
+
+async function fetchOne(b, i) {
+  const it = b.items[i];
+  try {
+    b.blobs[i] = await fetchImage({ src: it.src, pageUrl: b.pageUrl, tabId: b.tabId, frameId: 0 });
+  } catch (e) {
+    if (e.code === 'needs-permission') b.blocked.push({ i, origin: e.origin });
+    else b.failed.push({ src: it.src, error: e.message });
+  }
+  b.fetched++;
+  broadcast();
+}
+
+async function pool(indices, n, fn) {
+  let next = 0;
+  const worker = async () => { while (next < indices.length) await fn(indices[next++]); };
+  await Promise.all(Array.from({ length: Math.min(n, indices.length) }, worker));
+}
+
+async function runBatchFetch(b) {
+  await pool(b.items.map((_, i) => i), 4, (i) => fetchOne(b, i));
+  if (b !== batch) return;
+  if (b.blocked.length) {
+    b.origins = [...new Set(b.blocked.map((x) => x.origin))];
+    b.status = 'needs-permission';
+    broadcast();
+    return;
+  }
+  await finishBatch(b);
+}
+
+export async function continueBatch({ skip = false } = {}) {
+  const b = batch;
+  if (!b || b.status !== 'needs-permission') return;
+  b.status = 'fetching';
+  const blocked = b.blocked;
+  b.blocked = [];
+  b.origins = [];
+  if (skip) {
+    for (const x of blocked) b.failed.push({ src: b.items[x.i].src, error: 'Skipped: the site does not let extensions read its images.' });
+  } else {
+    b.fetched -= blocked.length;
+    await pool(blocked.map((x) => x.i), 4, async (i) => {
+      try { b.blobs[i] = await fetchImage({ src: b.items[i].src, pageUrl: b.pageUrl, tabId: b.tabId, frameId: 0 }); } catch (e) {
+        b.failed.push({ src: b.items[i].src, error: e.code === 'needs-permission' ? 'No access to this site.' : e.message });
+      }
+      b.fetched++;
+      broadcast();
+    });
+  }
+  try { await finishBatch(b); } catch (e) { b.status = 'error'; b.error = e.message; broadcast(); }
+}
+
+// Firefox may close the popup while its permission prompt is open; continue from here then.
+chrome.permissions?.onAdded?.addListener(async () => {
+  const b = batch;
+  if (!b || b.status !== 'needs-permission') return;
+  const ok = await chrome.permissions.contains({ origins: b.origins }).catch(() => false);
+  if (ok) continueBatch({ skip: false });
+});
+
+async function convertForBatch(blob, b, settings) {
+  if (b.output === 'pdf') {
+    const opts = optionsFor('pdf', settings);
+    try {
+      return await convertBlob(blob, 'pdf', opts);
+    } catch (e) {
+      if (e.code !== 'needs-dom') throw e;
+      const png = await convertAny(blob, 'png', opts); // SVG: render in the offscreen document first
+      return convertBlob(png.blob, 'pdf', opts);
+    }
+  }
+  if (b.fmt === 'original') {
+    const kind = sniffType(new Uint8Array(await blob.slice(0, 512).arrayBuffer()));
+    const ext = EXT_OF[kind] || (blob.type.startsWith('image/') ? blob.type.slice(6).replace(/\+.*$/, '').replace('jpeg', 'jpg') : '');
+    if (!ext) throw errorWith('This file is not an image.');
+    return { blob, ext, width: '', height: '' };
+  }
+  return convertAny(blob, b.fmt, optionsFor(b.fmt, settings));
+}
+
+function uniqueName(name, taken) {
+  if (!taken.has(name.toLowerCase())) { taken.add(name.toLowerCase()); return name; }
+  const dot = name.lastIndexOf('.');
+  for (let n = 2; ; n++) {
+    const candidate = `${name.slice(0, dot)} (${n})${name.slice(dot)}`;
+    if (!taken.has(candidate.toLowerCase())) { taken.add(candidate.toLowerCase()); return candidate; }
+  }
+}
+
+async function finishBatch(b) {
+  b.status = 'saving';
+  broadcast();
+  const settings = await getSettings();
+  const zipEntries = [];
+  const pdfPages = [];
+  const taken = new Set();
+  for (let i = 0; i < b.items.length; i++) {
+    const blob = b.blobs[i];
+    if (!blob) continue;
+    b.blobs[i] = null; // free memory as we go
+    const it = b.items[i];
+    try {
+      const out = await convertForBatch(blob, b, settings);
+      if (b.output === 'pdf') {
+        pdfPages.push(out.pdfPage);
+      } else {
+        const ext = out.ext || FORMATS[b.fmt].ext;
+        const common = { src: it.src, pageUrl: b.pageUrl, ext, pattern: settings.namePattern, width: out.width, height: out.height };
+        if (b.output === 'zip') {
+          zipEntries.push({ name: uniqueName(buildFilename(common), taken), data: new Uint8Array(await out.blob.arrayBuffer()) });
+        } else {
+          b.downloadIds.push(await saveBlob(out.blob, buildFilename({ ...common, subfolder: settings.subfolder }), false));
+        }
+      }
+      b.saved++;
+    } catch (e) {
+      b.failed.push({ src: it.src, error: e.message || String(e) });
+    }
+    b.done++;
+    broadcast();
+  }
+  if (b.output !== 'files' && b.saved) {
+    const ext = b.output === 'zip' ? 'zip' : 'pdf';
+    const blob = b.output === 'zip' ? makeZip(zipEntries) : makePdf(pdfPages, { pageSize: settings.pdfPageSize });
+    b.filename = buildFilename({ src: b.pageUrl, pageUrl: b.pageUrl, ext, pattern: '{site} images {date}', subfolder: settings.subfolder });
+    b.downloadIds.push(await saveBlob(blob, b.filename, settings.askWhere));
+  }
+  b.status = 'done';
+  broadcast();
+}
+
 // ---------- per-site permission flow ----------
 
 async function openGrantPage(job, origin) {
@@ -304,4 +387,4 @@ async function runPendingJob(id) {
 }
 
 // Exposed for the automated tests (tests/extension.test.mjs). Not reachable by web pages.
-globalThis.saveform = { menuIds, canEncode, handleClick, runJob, fetchImage, convertAny, saveBlob };
+globalThis.saveform = { menuIds, canEncode, handleClick, runJob, fetchImage, convertAny, saveBlob, startBatch, continueBatch, batchState, collectPageImages };

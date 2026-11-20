@@ -16,15 +16,16 @@ API = "https://addons.mozilla.org/api/v5"
 ADDON_ID = "saveform@save-image-format"
 SITE = "https://janwan2003.github.io/save-image-format/"
 
-SUMMARY = ("Right-click any image and save it as PNG, JPG, WebP or PDF, or copy it as PNG. "
-           "Converted on your device. No tracking, no network calls, open source.")
-DESCRIPTION = """Saveform adds "Save image as" to the right-click menu for images, with a submenu: PNG, JPG, WebP, PDF, and "Copy as PNG".
+SUMMARY = ("Right-click any image and save it as PNG, JPG, WebP or PDF, or save every image on a page at once "
+           "as files, a ZIP or one PDF. Converted on your device. No tracking, open source.")
+DESCRIPTION = """Saveform adds "Save image as" to the right-click menu for images, with a submenu: PNG, JPG, WebP, PDF, and "Copy as PNG". Its toolbar button lists every image on the current page so you can save many at once: as separate files, as one ZIP, or combined into one PDF.
 
 Useful when "Save Image As…" gives you a .webp or .avif file that your editor, slide deck, upload form or older system will not open.
 
 • Converts on your device. The image is never uploaded anywhere.
 • No analytics, no ads, no account, no remote code.
 • Asks for almost nothing: no access to the pages you browse. If a server blocks add-ons from reading an image, Saveform asks for access to that one site, and you can revoke it.
+• Save all images on a page: pick them in a grid, hide small icons, choose PNG/JPG/WebP or keep the original format. Picks the largest version a page offers (srcset) and finds CSS background images too. Shortcut: Alt+Shift+S.
 • Keeps transparency in PNG and WebP; fills it with white (or a colour you pick) for JPG and PDF.
 • PDF: one page, either the size of the image or A4 / US Letter with the image fitted.
 • Renders SVG images at a usable size (1024 px by default).

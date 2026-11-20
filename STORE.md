@@ -14,12 +14,14 @@ Build both zips with `node scripts/pack-extension.mjs`. The AMO listing text liv
 **Name:** Saveform: Save Image as PNG, JPG, WebP, PDF
 **Category:** Tools / Photos
 **Short description (≤132 chars):**
-Right-click any image and save it as PNG, JPG, WebP or PDF. Converted on your device. No tracking, no network calls, open source.
+Save any image as PNG, JPG, WebP or PDF from the right-click menu, or every image on a page at once. Converted on your device.
 
 **Long description:**
 
 Saveform adds "Save image as" to the right-click menu for images, with a submenu:
 PNG, JPG, WebP, PDF (and AVIF where the browser can write it), plus "Copy as PNG".
+Its toolbar button lists every image on the current page so you can save many at once:
+as separate files, as one ZIP, or combined into one PDF.
 
 Useful when "Save image as…" gives you a .webp or .avif file that your editor, slide deck,
 upload form or older system will not open.
@@ -28,6 +30,9 @@ upload form or older system will not open.
 • No analytics, no ads, no account, no remote code.
 • Asks for almost nothing: no access to the pages you browse. If a server blocks extensions
   from reading an image, Saveform asks for access to that one site, and you can revoke it.
+• Save all images on a page: pick them in a grid, hide small icons, choose PNG/JPG/WebP or keep
+  the original format, and get separate files, one ZIP or one PDF. Picks the largest version a
+  page offers (srcset) and finds CSS background images too. Shortcut: Alt+Shift+S.
 • Keeps transparency in PNG and WebP; fills it with white (or a colour you pick) for JPG and PDF.
 • PDF: one page, either the size of the image or A4 / US Letter with the image fitted.
 • Renders SVG images at a usable size (1024 px by default).
@@ -38,13 +43,13 @@ upload form or older system will not open.
 Website and free online converters: https://janwan2003.github.io/save-image-format/
 Source: https://github.com/janwan2003/save-image-format
 
-**Single purpose:** Save images from web pages in a different image format.
+**Single purpose:** Save images from web pages in a format the user picks (one image from the right-click menu, or several from the toolbar button).
 
 **Permission justifications:**
 - contextMenus: adds the "Save image as" submenu on images.
 - downloads: writes the converted image to the user's downloads.
-- activeTab: reads the right-clicked image from the current site after the user clicks the menu.
-- scripting: reads blob: images from inside the page, copies the result to the clipboard, shows a short status message.
+- activeTab: reads the right-clicked image, or the page's images after the user clicks the toolbar button, from the current site.
+- scripting: lists the page's image addresses when the user clicks the toolbar button, reads blob: images from inside the page, copies the result to the clipboard, shows a short status message.
 - storage: stores the user's settings.
 - offscreen: renders SVG images, which the service worker cannot decode.
 - optional host permissions (<all_urls>): requested per site, only when an image server refuses cross-origin reads, so that one image can be downloaded.

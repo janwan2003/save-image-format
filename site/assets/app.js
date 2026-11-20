@@ -4,7 +4,7 @@
 import { FORMATS, canEncode, convertBlob, decode, sniffType } from '../lib/convert.js';
 import { makePdf } from '../lib/pdf.js';
 import { baseNameFromUrl } from '../lib/filename.js';
-import { makeZip } from './zip.js';
+import { makeZip } from '../lib/zip.js';
 
 const tool = document.querySelector('[data-tool]');
 if (tool) init(tool);

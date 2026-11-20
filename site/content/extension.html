@@ -1,6 +1,6 @@
 <section class="hero hero-ext">
 <h1>Saveform for Chrome: save any web image as PNG, JPG, WebP or PDF</h1>
-<p class="lede">Right-click an image, pick a format, and it is saved in that format. The conversion happens on your computer, with the same code that powers the <a href="{{root}}">converter on this site</a>.</p>
+<p class="lede">Right-click an image, pick a format, and it is saved in that format. Or click the toolbar button to save every image on the page at once. The conversion happens on your computer, with the same code that powers the <a href="{{root}}">converter on this site</a>.</p>
 <p class="badge-line"><span class="badge">Firefox: submitted to Mozilla, in review</span> <span class="badge">Chrome Web Store: coming soon</span></p>
 </section>
 
@@ -8,6 +8,7 @@
 <h2>What it does</h2>
 <ul>
   <li>Adds a <strong>Saveform</strong> entry to the right-click menu on images, with <em>Save as PNG</em>, <em>Save as JPG</em>, <em>Save as WebP</em> and <em>Save as PDF</em> (and AVIF where the browser can create it), plus <em>Copy as PNG</em>.</li>
+  <li>Its toolbar button (shortcut <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) shows every image on the page in a grid. Untick what you don’t want, hide small icons, and save the rest as separate files, one ZIP or one PDF, converted to PNG, JPG or WebP or kept in their original format. It picks the largest version a page offers and finds CSS background images too.</li>
   <li>Converts the image locally and saves it through Chrome’s normal downloads, with a sensible file name. In the settings you can build names from the site, date or image size, and pick a folder inside Downloads.</li>
   <li>Works with the formats sites like to serve but many apps refuse, such as WebP and AVIF.</li>
   <li>Collects nothing. No analytics, no accounts, no remote code. Read the <a href="{{root}}privacy/">privacy policy</a>.</li>
@@ -20,9 +21,9 @@
   <dt><code>downloads</code></dt>
   <dd>Saves the converted file through Chrome’s own download system, so it lands in your usual Downloads folder and shows up in your download list.</dd>
   <dt><code>activeTab</code></dt>
-  <dd>Gives the extension temporary access to the tab you right-clicked in, only at the moment you choose a Saveform entry, so it can read that image.</dd>
+  <dd>Gives the extension temporary access to the current tab, only when you choose a Saveform menu entry or click its toolbar button, so it can read the images you want to save.</dd>
   <dt><code>scripting</code></dt>
-  <dd>Together with the temporary tab access above, lets the extension run its own small piece of code in that tab to read the image when it can only be read from inside the page, to copy the result to your clipboard, and to show a short status notice.</dd>
+  <dd>Together with the temporary tab access above, lets the extension run its own small piece of code in that tab to list the page’s images (toolbar button), to read an image when it can only be read from inside the page, to copy the result to your clipboard, and to show a short status notice.</dd>
   <dt><code>storage</code></dt>
   <dd>Remembers your settings, such as JPG quality, on your device.</dd>
   <dt><code>offscreen</code></dt>
@@ -39,7 +40,7 @@
   <li>Open <code>chrome://extensions</code> in Chrome (type it into the address bar).</li>
   <li>Turn on <strong>Developer mode</strong> with the switch in the top-right corner.</li>
   <li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder inside the downloaded repository.</li>
-  <li>Right-click any image on the web and look for the Saveform entry.</li>
+  <li>Right-click any image on the web and look for the Saveform entry, or pin the Saveform button to the toolbar (puzzle-piece menu → pin) to save several images from a page.</li>
 </ol>
 <p class="muted">Extensions loaded this way do not update automatically; download the repository again to get a newer version. Edge and other Chromium-based browsers accept the same steps on their own extensions page.</p>
 

@@ -8,6 +8,9 @@ export const DEFAULTS = {
   pdfPageSize: 'fit',   // 'fit' (page = image), 'a4' or 'letter'
   namePattern: '{name}', // see buildFilename() in filename.js
   subfolder: '',        // inside Downloads; '' = Downloads itself
+  batchFormat: 'png',   // toolbar popup (save all images): png | jpg | webp | avif | original
+  batchOutput: 'files', // files | zip | pdf
+  batchMinSize: 100,    // hide images whose longer side is smaller (px); 0 = show all
 };
 
 export async function getSettings() {

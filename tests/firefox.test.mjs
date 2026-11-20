@@ -53,7 +53,8 @@ before(async () => {
 
   server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
-    if (url.pathname === '/page.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><h1>test page</h1>'); return; }
+    if (url.pathname === '/page.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(`<!doctype html><h1>test page</h1>
+      <img src="/same.webp"><img src="http://localhost:${cdnPort}/cors/photo.webp"><img src="http://localhost:${cdnPort}/cors/logo.svg">`); return; }
     const f = fixtures[url.pathname.split('/').pop()];
     if (!f) { res.writeHead(404); res.end(); return; }
     const headers = { 'content-type': f.type };
@@ -199,4 +200,32 @@ test('Firefox: Copy as PNG writes the clipboard', { skip }, async () => {
   const res = await click('copy:png', `http://127.0.0.1:${pagePort}/same.webp`);
   assert.equal(res.ok, true, JSON.stringify(res));
   assert.equal(res.copied, true);
+});
+
+test('Firefox: save all images on the page as one ZIP (collect in page, batch on the event page)', { skip }, async () => {
+  const r = await run(`
+    const [tab] = await browser.tabs.query({ url: 'http://127.0.0.1/*' });
+    const bg = await browser.runtime.getBackgroundPage();
+    const [{ result }] = await browser.scripting.executeScript({ target: { tabId: tab.id }, func: bg.saveform.collectPageImages });
+    const items = result.images.filter((x) => /same\\.webp$|photo\\.webp$|logo\\.svg$/.test(x.src));
+    const started = bg.saveform.startBatch({ items, fmt: 'png', output: 'zip', tabId: tab.id, pageUrl: result.url });
+    for (let i = 0; i < 400; i++) {
+      const s = bg.saveform.batchState();
+      if (s.status === 'done' || s.status === 'error' || s.status === 'needs-permission') return { started, s, found: result.images.map((x) => x.src) };
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    return { started, s: bg.saveform.batchState() };`);
+  assert.equal(r.started.ok, true, JSON.stringify(r));
+  assert.equal(r.s.status, 'done', JSON.stringify(r));
+  assert.equal(r.s.saved, 3, JSON.stringify(r));
+  const zip = await savedFile(r.s.filename);
+  assert.equal(zip.readUInt32LE(0), 0x04034b50, 'ZIP local header');
+  const names = [];
+  for (let p = 0; zip.readUInt32LE(p) === 0x04034b50;) {
+    const size = zip.readUInt32LE(p + 18), n = zip.readUInt16LE(p + 26), x = zip.readUInt16LE(p + 28);
+    names.push(zip.subarray(p + 30, p + 30 + n).toString());
+    assert.equal(zip.subarray(p + 30 + n + x + 1, p + 30 + n + x + 4).toString(), 'PNG');
+    p += 30 + n + x + size;
+  }
+  assert.deepEqual(names.sort(), ['logo.png', 'photo.png', 'same.png']);
 });
