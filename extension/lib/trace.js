@@ -11,10 +11,13 @@
 // a blob must be to be kept).
 //
 // Steps:
-// 1. Colours. Pixels with alpha < 128 are transparent and never traced. The palette is chosen
+// 1. Colours. Pixels with alpha < 128 are transparent and never traced. When the caller scaled
+//    a small image up for tracing, it passes the original pixels as paletteSource: colours are
+//    picked there, because smooth upscaling turns sharp colour boundaries into gentle ramps
+//    whose blends would look like colours of their own. The palette is chosen
 //    (lib/png-quant.js choosePalette) from "flat" pixels only, ones that match their four
 //    neighbours, so the in-between colours of anti-aliased edges do not get palette entries of
-//    their own; entries within ~20 levels of a more common one are merged (JPEG noise otherwise
+//    their own (only when at least half the pixels are flat, as in logos; photos use all); entries within ~20 levels of a more common one are merged (JPEG noise otherwise
 //    splits one white into several); every pixel then takes the nearest palette colour. 'bw' uses Otsu's threshold on
 //    luminance (composited on white).
 // 2. Despeckle. Connected regions (4-neighbour) smaller than the speckle size join the colour
@@ -69,7 +72,8 @@ export function traceImage(rgba, width, height, options = {}) {
   const speckle = Math.max(det.speckleMin, Math.round(n / det.speckleDiv));
 
   // 1. labels: 0 = transparent, 1..k = palette entry k-1
-  const { labels, palette } = bw ? labelBw(rgba, n) : labelColors(rgba, width, height, maxColors);
+  const src = options.paletteSource; // { rgba, width, height }: pick colours here (see below)
+  const { labels, palette } = bw ? labelBw(rgba, n) : labelColors(rgba, width, height, maxColors, src);
   // 2. despeckle
   despeckle(labels, width, height, speckle);
   despeckle(labels, width, height, speckle);
@@ -139,38 +143,12 @@ export function otsu(hist, total) {
   return t;
 }
 
-function labelColors(rgba, width, height, maxColors) {
+function labelColors(rgba, width, height, maxColors, src) {
   const n = width * height;
-  const opaque = (p) => rgba[p + 3] >= 128;
-  const close = (p, q) => Math.abs(rgba[p] - rgba[q]) <= 12 && Math.abs(rgba[p + 1] - rgba[q + 1]) <= 12 && Math.abs(rgba[p + 2] - rgba[q + 2]) <= 12;
-  let opaqueCount = 0, flatCount = 0;
-  const flat = new Uint8Array(n);
-  for (let y = 0, i = 0; y < height; y++) {
-    for (let x = 0; x < width; x++, i++) {
-      const p = i * 4;
-      if (!opaque(p)) continue;
-      opaqueCount++;
-      let ok = true;
-      if (x > 0) ok = ok && opaque(p - 4) && close(p, p - 4);
-      if (x < width - 1) ok = ok && opaque(p + 4) && close(p, p + 4);
-      if (y > 0) ok = ok && opaque(p - width * 4) && close(p, p - width * 4);
-      if (y < height - 1) ok = ok && opaque(p + width * 4) && close(p, p + width * 4);
-      if (ok) { flat[i] = 1; flatCount++; }
-    }
-  }
+  const palette = src ? pickPalette(src.rgba, src.width, src.height, maxColors) : pickPalette(rgba, width, height, maxColors);
   const labels = new Uint16Array(n);
-  if (!opaqueCount) return { labels, palette: new Uint8Array(0) };
-  // Photos and gradients have few flat pixels; then every opaque pixel counts.
-  const useFlat = flatCount >= 64 && flatCount >= opaqueCount * 0.05;
-  const m = useFlat ? flatCount : opaqueCount;
-  const sample = new Uint8Array(m * 4);
-  for (let i = 0, j = 0; i < n; i++) {
-    const p = i * 4;
-    if (useFlat ? !flat[i] : !opaque(p)) continue;
-    sample[j++] = rgba[p]; sample[j++] = rgba[p + 1]; sample[j++] = rgba[p + 2]; sample[j++] = 255;
-  }
-  const palette = mergeClose(choosePalette(sample, m, maxColors), sample, m);
   const k = palette.length / 4;
+  if (!k) return { labels, palette };
   // Nearest palette entry, cached per 6-bit-per-channel cell (looked up for the cell's centre).
   const cache = new Int16Array(1 << 18).fill(-1);
   for (let i = 0, p = 0; i < n; i++, p += 4) {
@@ -190,6 +168,41 @@ function labelColors(rgba, width, height, maxColors) {
     labels[i] = best + 1;
   }
   return { labels, palette };
+}
+
+/** Palette for the tracer (straight RGBA, opaque entries) from an image's pixels. */
+function pickPalette(rgba, width, height, maxColors) {
+  const n = width * height;
+  const opaque = (p) => rgba[p + 3] >= 128;
+  const close = (p, q) => Math.abs(rgba[p] - rgba[q]) <= 12 && Math.abs(rgba[p + 1] - rgba[q + 1]) <= 12 && Math.abs(rgba[p + 2] - rgba[q + 2]) <= 12;
+  let opaqueCount = 0, flatCount = 0;
+  const flat = new Uint8Array(n);
+  for (let y = 0, i = 0; y < height; y++) {
+    for (let x = 0; x < width; x++, i++) {
+      const p = i * 4;
+      if (!opaque(p)) continue;
+      opaqueCount++;
+      let ok = true;
+      if (x > 0) ok = ok && opaque(p - 4) && close(p, p - 4);
+      if (x < width - 1) ok = ok && opaque(p + 4) && close(p, p + 4);
+      if (y > 0) ok = ok && opaque(p - width * 4) && close(p, p - width * 4);
+      if (y < height - 1) ok = ok && opaque(p + width * 4) && close(p, p + width * 4);
+      if (ok) { flat[i] = 1; flatCount++; }
+    }
+  }
+  if (!opaqueCount) return new Uint8Array(0);
+  // Logos and icons are mostly flat, and their few non-flat pixels are edges. In a photo the
+  // flat pixels are only its calm parts (sky, a path), and foliage would get no colour: there
+  // every opaque pixel counts.
+  const useFlat = flatCount >= 64 && flatCount >= opaqueCount * 0.5;
+  const m = useFlat ? flatCount : opaqueCount;
+  const sample = new Uint8Array(m * 4);
+  for (let i = 0, j = 0; i < n; i++) {
+    const p = i * 4;
+    if (useFlat ? !flat[i] : !opaque(p)) continue;
+    sample[j++] = rgba[p]; sample[j++] = rgba[p + 1]; sample[j++] = rgba[p + 2]; sample[j++] = 255;
+  }
+  return mergeClose(choosePalette(sample, m, maxColors), sample, m);
 }
 
 /**

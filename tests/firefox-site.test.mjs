@@ -124,3 +124,20 @@ test('Firefox: tiff-to-png decodes LZW, JPEG-in-TIFF and fax G4 TIFFs in the wor
   assert.equal(fax.state, 'done', JSON.stringify(fax));
   assert.deepEqual(fax.size, [96, 64]);
 });
+
+test('Firefox: png-to-svg traces a PNG in the module worker into an SVG with the exact colours', { skip }, async () => {
+  const { encodePng8 } = await import('../extension/lib/png-quant.js');
+  const { writeFileSync } = await import('node:fs');
+  const w = 64, h = 48, rgba = new Uint8Array(w * h * 4);
+  const colours = [[200, 120, 48], [48, 176, 64], [48, 112, 200], [176, 64, 144]];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) rgba.set([...colours[(y >= h / 2 ? 2 : 0) + (x >= w / 2 ? 1 : 0)], 255], (y * w + x) * 4);
+  // Inside the repo: snap-packaged Firefox cannot read /tmp. Same bytes every run (committed).
+  const file = path.join(ROOT, 'tests/fixtures/svg-quadrants.png');
+  writeFileSync(file, await encodePng8(rgba, w, h, { maxColors: 256, dither: false }));
+  const r = await convert('png-to-svg', file);
+  assert.equal(r.state, 'done', JSON.stringify(r));
+  assert.match(r.text, /PNG .* → SVG .*64 × 48 px · 4 colours/);
+  assert.deepEqual(r.size, [64, 48]);
+  colours.forEach((rgb, i) => assert.ok(near(r.quadrants[i], rgb, 1), `quadrant ${i}: ${r.quadrants[i]} ≈ ${rgb}`));
+  assert.ok(requests.includes('/assets/trace-worker.js'), 'tracer worker fetched from this site');
+});

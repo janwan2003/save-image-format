@@ -11,6 +11,7 @@ import { decodeTiff, tiffPageCount } from './tiff-client.js';
 import { decodePdf, pdfPageCount, closePdf } from './pdf-client.js';
 import { isRaw, decodeRaw } from './raw.js';
 import { decodePsd } from './psd-client.js';
+import { traceInWorker } from './trace-client.js';
 
 // Formats the browser may not decode itself. HEIC (iPhone photos) goes to a WebAssembly
 // decoder that is only downloaded when the first HEIC file is added; TIFF to our own decoder.
@@ -284,7 +285,7 @@ function init(root) {
           ? { ...FALLBACK_DECODERS, tiff: (b) => decodeTiff(b, item.page), pdf: () => decodePdf(item.file, item.page, { dpi: opts.pdfDpi }) }
           : FALLBACK_DECODERS;
         const format = opts.format === 'same' ? (item.raw ? 'jpg' : await sameFormat(item)) : opts.format;
-        let r = opts.keepJpeg && !item.raw ? await keepJpegBytes(item.file) : await convertBlob(item.file, format, { ...opts, preview: true, fallbackDecoders: decoders, preferFallback: item.page != null, decoder: item.raw ? decodeRaw : null });
+        let r = opts.keepJpeg && !item.raw ? await keepJpegBytes(item.file) : await convertBlob(item.file, format, { ...opts, preview: true, tracer: traceInWorker, fallbackDecoders: decoders, preferFallback: item.page != null, decoder: item.raw ? decodeRaw : null });
         // "Same as original" is for making files smaller: if re-encoding did not help, keep the file.
         if (opts.format === 'same' && !r.resized && item.page == null && r.blob.size >= item.file.size && r.sourceKind === KIND_OF[format]) {
           r = { ...r, blob: new Blob([item.file], { type: FORMATS[format].mime }), keptOriginal: true, targetMet: r.targetBytes ? item.file.size <= r.targetBytes : undefined };

@@ -216,11 +216,13 @@ async function open(path) {
   const page = await context.newPage();
   const errors = [];
   const external = [];
+  const requested = [];
+  page.on('request', (r) => requested.push(new URL(r.url()).pathname));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('request', (r) => { const u = new URL(r.url()); if (/^https?:$/.test(u.protocol) && u.hostname !== '127.0.0.1') external.push(r.url()); });
   const resp = await page.goto(origin + BASE_PATH + path);
-  return { page, resp, errors, external, close: () => context.close() };
+  return { page, resp, errors, external, requested, close: () => context.close() };
 }
 
 async function fixture(page, mime, w, h, draw) {
@@ -269,7 +271,7 @@ test('the SVG pages have their own title, h1, canonical and sitemap entry, with 
 });
 
 test('png-to-svg traces a transparent PNG into paths; Black and white re-traces into one black shape', async () => {
-  const { page, errors, external, close } = await open('/png-to-svg/');
+  const { page, errors, external, requested, close } = await open('/png-to-svg/');
   const png = await fixture(page, 'image/png', 240, 160, `
     g.fillStyle = '#ff7f00'; g.beginPath(); g.arc(70, 80, 50, 0, 7); g.fill();
     g.fillStyle = '#123456'; g.fillRect(140, 30, 80, 100);`);
@@ -279,6 +281,7 @@ test('png-to-svg traces a transparent PNG into paths; Black and white re-traces 
   assert.match(meta, /PNG .* → SVG .*240 × 160 px.*2 colours, 3 shapes/); // the bottom layer outlines both shapes (stacking)
   const out = await downloadRow(page);
   assert.equal(out.name, 'logo.svg');
+  assert.ok(requested.some((u) => u.endsWith('/assets/trace-worker.js')), 'traced in the worker');
   assert.match(out.text, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" width="240" height="160"/);
   assert.doesNotMatch(out.text, /<image|base64/);
   assert.equal((out.text.match(/<path /g) || []).length, 2, "one path per colour");

@@ -436,6 +436,8 @@ async function main() {
     copyFile(join(SITE, 'assets/heic-worker.js'), join(DIST, 'assets/heic-worker.js')),
     copyFile(join(SITE, 'assets/tiff.js'), join(DIST, 'assets/tiff.js')),
     copyFile(join(SITE, 'assets/tiff-worker.js'), join(DIST, 'assets/tiff-worker.js')),
+    copyFile(join(SITE, 'assets/trace-client.js'), join(DIST, 'assets/trace-client.js')),
+    copyFile(join(SITE, 'assets/trace-worker.js'), join(DIST, 'assets/trace-worker.js')),
     copyFile(join(SITE, 'assets/tiff-client.js'), join(DIST, 'assets/tiff-client.js')),
     copyFile(join(SITE, 'assets/pdf-client.js'), join(DIST, 'assets/pdf-client.js')),
     copyFile(join(SITE, 'assets/raw.js'), join(DIST, 'assets/raw.js')),

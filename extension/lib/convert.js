@@ -204,7 +204,11 @@ export async function convertBlob(input, formatId, options = {}) {
       const tw = Math.max(1, Math.round(out.width * f)), th = Math.max(1, Math.round(out.height * f));
       const [, tctx] = f !== 1 ? render(tw, th) : [canvas, ctx];
       const { data } = tctx.getImageData(0, 0, tw, th);
-      const t = traceImage(data, tw, th, { colors: options.traceColors ?? 8, detail: options.traceDetail || 'normal', outWidth: out.width, outHeight: out.height });
+      const traceOpts = { colors: options.traceColors ?? 8, detail: options.traceDetail || 'normal', outWidth: out.width, outHeight: out.height };
+      // Scaled up: colours are picked from the unscaled pixels (smoothing blends sharp edges).
+      if (f > 1) traceOpts.paletteSource = { rgba: ctx.getImageData(0, 0, out.width, out.height).data, width: out.width, height: out.height };
+      // options.tracer: the site's worker version of traceImage (same arguments, returns a promise).
+      const t = options.tracer ? await options.tracer(data, tw, th, traceOpts) : traceImage(data, tw, th, traceOpts);
       return { ...base, blob: new Blob([t.svg], { type: fmt.mime }), traced: { colors: t.colors, paths: t.paths, width: tw, height: th } };
     }
     if (formatId === 'gif') {
