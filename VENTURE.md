@@ -142,7 +142,19 @@ colour space). The worker now reads the primary image's profile via libheif's C 
 `site/assets/icc.js` converts ICC matrix/TRC profiles and nclx tags (P3, BT.2020, DCI-P3) to sRGB; sRGB profiles are skipped; LUT-only ICC
 and PQ/HLG HDR are passed through unchanged (not tone-mapped). Fixtures `quadrants-p3.heic` / `-untagged.heic` (our own P3 ICC profile).
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 33 converter pages (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
+**TIFF input (session 8):** the site decodes TIFF with our own decoder (`site/assets/tiff.js`, no dependencies; run in
+`tiff-worker.js`, loaded via `tiff-client.js` when the first TIFF is added; `sniffType` in `extension/lib/convert.js` now returns
+`tiff`, and `decode()` takes `preferFallback`). It covers TIFF and BigTIFF; strips and tiles (including tile offsets stored in the strip
+tags); no compression, PackBits, LZW (also old-style LZW), Deflate, JPEG (compression 7), CCITT G3/G4 fax; 1–32-bit integer and 32-bit
+float samples; bilevel, grey, RGB, palette, CMYK, YCbCr (with JPEG, or subsampled without it); associated and unassociated alpha;
+Orientation; an ICC profile is converted to sRGB with `icc.js`. A **multi-page TIFF becomes one row per page** (`name (page k of N)`,
+output `name-page-k.ext`); PDF rows now preview the page's own JPEG. Not supported (clear error): old-style JPEG (6), LogLuv,
+ThunderScan, LZMA/ZSTD/WebP/JPEG 2000, CIELab, 64-bit float, floating-point predictor. Pages: /tiff-to-jpg/, /tiff-to-png/, /tiff-to-pdf/.
+**/guides/ index (session 8, subagent):** one card per guide plus converters grouped by source format; footer shows 3 guides + "All guides →";
+"Guides" in the header nav. **Store screenshot 2** (`docs/store/screenshot-2-1280x800.png`, the real save-all popup with stubbed data,
+made by `scripts/store-assets.mjs`) is listed in `store/chrome-privacy.md` and `STORE.md` for the operator to upload.
+
+**Website** (live, https://janwan2003.github.io/save-image-format/): 36 converter pages (+3 TIFF pages in session 8), (+3 HEIC pages in session 6, +heic→webp and avif→webp in session 7) (png/jpg/webp→gif added in session 5, with
 our own GIF89a encoder `extension/lib/gif.js`: median-cut palette, optional Floyd–Steinberg dithering, 1-bit transparency, LZW; GIF
 is also on the index format menu, not in the extension menu) (index,
 webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
@@ -151,7 +163,7 @@ jfif→jpg/png, image→pdf, favicon generator),
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 42 URLs (session 7). Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 46 URLs (session 8: +3 TIFF pages, +/guides/). Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -231,6 +243,27 @@ sitemap 42 <loc>; live /heic-to-png/ gave exactly Chromium's values for all 4 P3
 real iPhone photo (4032×3024) in the same 2.7 s batch, requests only to janwan2003.github.io, 0 console errors. CWS draft `--status`:
 crxVersion 0.4.2. `web-ext lint` on the 0.4.2 Firefox zip: 0 errors, 1 warning (UNSUPPORTED_API, offscreen). IndexNow 42 URLs (HTTP 200),
 sitemap resubmitted (204). Subagent screenshots of the 3 new pages looked right (1280 px and 390 px).
+**Verified (2026-11-20, session 8):** `npm test` 116/116 in GitHub Actions run 44761479754 on commit 5934b69 (0 skipped; Chromium +
+Firefox); Pages run 44761479874. The first push (eb0a60d, run 44761102027) failed 115/116: the new /guides/ test found the header nav on two
+rows at 390 px with CI's fallback font, a real defect; fixed in CSS and re-measured locally with DejaVu Sans forced (nav 311 px of 350 px).
+New: `tests/tiff.test.mjs` (25 cases: 22 fixture variants from `scripts/make-tiff-fixtures.py` decoded pixel-for-pixel like ImageMagick
+(tolerance 0 except 16-bit/palette/CMYK ≤ 2), page counting with a thumbnail IFD, ICC profile handed over, clear errors), 4 Chromium site
+tests (JPEG-in-TIFF, alpha, tiles, CMYK, G4, 16-bit, orientation through /tiff-to-png/; multi-page + G3 into a 4-page PDF; numbered JPGs in
+a ZIP; truncated TIFF error; a Display P3 tagged TIFF matches Chromium's own P3 conversion within 2/255), 1 real-Firefox test (LZW, JPEG,
+G4 in the worker), 4 guides-index tests. **Third-party corpus:** libtiff's sample set (pics-3.8.0.tar.gz from download.osgeo.org, 61 files,
+in /tmp, not committed): 51 decode with mean difference < 1/255 and no pixel off by > 8 against ImageMagick; ycbcr-cat.tif (4:2:0 YCbCr)
+matches Pillow/libtiff within 1/255 (ImageMagick's own decode of it is wrong); dscf0013.tif (Fuji camera, 4:2:2 YCbCr, ImageMagick and
+Pillow both fail) looked right when viewed; quad-jpeg.tif in Chromium gives exactly ImageMagick's centre pixel; 7 give the intended
+"not supported" errors (3 LogLuv, 2 old-style JPEG, ThunderScan, 64-bit float). A 24 MP LZW TIFF (172 MB of plasma noise) decodes in
+about 4.0 s in Node. Live after Pages run 44761479874: /tiff-to-jpg/, /tiff-to-png/, /tiff-to-pdf/, /guides/, the 3 TIFF scripts return 200,
+sitemap 46 <loc>; live /tiff-to-pdf/ in headless Chromium turned multipage.tif (3 pages) + dscf0013.tif + libtiff's g3test.tif fax into one
+6-page PDF in 777 ms, 0 console errors, requests only to janwan2003.github.io. IndexNow 46 URLs (HTTP 200), sitemap resubmitted (204).
+Screenshot 2 viewed: clean, real popup.
+**Not verified (session 8):** TIFF in Safari (decodes TIFF natively, so the worker only runs for pages 2+); TIFFs straight from real
+scanners or Photoshop (only ImageMagick/Pillow-written fixtures and libtiff's samples); multi-hundred-MB scans (memory); the extension
+with the changed `convert.js` (only `sniffType`/`decode` options changed; the extension was not repacked or re-uploaded).
+**Known issues found (session 8):** a thumbnail IFD without NewSubfileType counts as a page (dscf0013.tif shows a 160×120 page 2);
+1-bit fax pages go into the PDF as JPEG at the chosen quality (g3test: 49 KB TIFF → 529 KB PDF page), which should be lossless.
 **Not verified (session 7):** HEIC files with HDR gain maps or 10-bit HDR (PQ/HLG are passed through untouched, not tone-mapped); 48 MP
 photos (memory); colour conversion in Safari (decodes HEIC natively, so the worker is not used there); the WebP limit message in the
 extension's in-page notice (same code path as the site, only the site was exercised); browser menu wording quoted in the new guide
@@ -260,8 +293,11 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    throttled again, `--listing` later). Check the review (`--status`); when approved, add the AMO link to the site and start AMO metrics.
 3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
    put effort into the page types that get impressions (compare the 4 HEIC URLs, added 2026-11-20, against the WebP ones). Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
-4. New store screenshot showing the save-all popup (`docs/store/`, made by `scripts/store-assets.mjs`) and upload it with the
-   listing; the popup is the clearest difference from the 400K-user PNG-only competitor.
+4. Store screenshot of the save-all popup: made in session 8 (`docs/store/screenshot-2-1280x800.png`), listed for the operator in
+   `store/chrome-privacy.md`. Still to do: add it to AMO (not yet supported by `amo-submit.py`) when 0.4.2 is submitted.
+4a. TIFF follow-ups: store bilevel/greyscale PDF pages losslessly (Flate) instead of JPEG (fax PDFs are 10× too big); skip
+   unmarked thumbnail IFDs (much smaller than page 1 and right after it, like dscf0013.tif); speed up LZW (24 MP noise: 4 s);
+   a "multi-page TIFF to PDF" and "open TIFF files" guide; TIFF output (jpg/png→tiff has search demand; own writer is simple).
 4b. Real-photo coverage: try an HDR iPhone photo (gain map) and a 48 MP HEIC (memory/time), e.g. from libheif's or Apple's public samples.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
@@ -276,6 +312,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-20 (session 8): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
+  CWS draft crxVersion 0.4.2 (`cws-upload.py --status`); `gsc.py status`: 0 errors/warnings, no search analytics rows for
+  2026-10-23..2026-11-20.
 
 - 2026-11-20 (session 7): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
   CWS draft crxVersion 0.4.2 (`cws-upload.py --status`); `gsc.py status`: sitemap pending, 0 errors, no search analytics rows
@@ -339,3 +379,8 @@ The site's converter pages could later carry one unobtrusive ad slot.
   instead of silently cropped (v0.4.2, CWS draft updated; AMO still throttled); subagent added /heic-to-webp/, /avif-to-webp/ and the
   "download all images from a page" guide (sitemap 39 → 42). Evidence: Actions run 44757933179 82/82, Pages run 44757932938, live P3
   conversion identical to Chromium's, IndexNow 42 URLs, web-ext lint 0 errors.
+- 2026-11-20 builder (session 8): TIFF input on the site with our own decoder (multi-page → one row per page, CCITT fax, LZW/Deflate/
+  JPEG/PackBits, CMYK, YCbCr, ICC → sRGB) + /tiff-to-jpg/, /tiff-to-png/, /tiff-to-pdf/; subagent: /guides/ index with compact footer and
+  store screenshot 2 (save-all popup); sitemap 42 → 46. Evidence: Actions run 44761479754 116/116 (first push failed 115/116 on a real
+  390 px nav wrap, fixed), Pages run 44761479874, libtiff's 61-file sample set vs ImageMagick/Pillow, live 6-page TIFF→PDF in 777 ms,
+  IndexNow 46 URLs.
