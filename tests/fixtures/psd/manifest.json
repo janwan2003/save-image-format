@@ -1,0 +1,232 @@
+{
+ "rgb8-rle": {
+  "file": "rgb8-rle.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "RGB 8-bit, PackBits, one layer",
+  "expected": "rgb8-rle.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "rgb8-raw": {
+  "file": "rgb8-raw.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "uncompressed",
+  "expected": "rgb8-raw.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "rgba8": {
+  "file": "rgba8.psd",
+  "reference": "magick",
+  "tolerance": 1,
+  "note": "negative layer count: first extra channel is merged transparency; white matte removed (ImageMagick does the same)",
+  "expected": "rgba8.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 249
+ },
+ "gray8": {
+  "file": "gray8.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "",
+  "expected": "gray8.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "gray16": {
+  "file": "gray16.psd",
+  "reference": "magick",
+  "tolerance": 1,
+  "note": "16-bit: high byte",
+  "expected": "gray16.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "rgb16": {
+  "file": "rgb16.psd",
+  "reference": "magick",
+  "tolerance": 1,
+  "note": "16-bit: high byte",
+  "expected": "rgb16.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "cmyk8": {
+  "file": "cmyk8.psd",
+  "reference": "magick",
+  "tolerance": 1,
+  "note": "CMYK stored inverted, naive conversion",
+  "expected": "cmyk8.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "indexed": {
+  "file": "indexed.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "",
+  "expected": "indexed.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "bitmap": {
+  "file": "bitmap.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "Bitmap mode, 1 bit, 0 = white",
+  "expected": "bitmap.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 255
+ },
+ "psb-rgb8": {
+  "file": "rgb8.psb",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "PSB: 8-byte section lengths, 4-byte RLE row counts",
+  "expected": "psb-rgb8.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "psb-rgba8": {
+  "file": "rgba8.psb",
+  "reference": "magick",
+  "tolerance": 1,
+  "note": "PSB with merged transparency",
+  "expected": "psb-rgba8.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "layered": {
+  "file": "layered.psd",
+  "reference": "magick",
+  "tolerance": 1,
+  "note": "three layers stored; the composite is read, not the layers",
+  "expected": "layered.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "extra-channel": {
+  "file": "extra-channel.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "4 channels, positive layer count: the 4th is a saved selection, not alpha",
+  "expected": "extra-channel.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 255
+ },
+ "extra-flat": {
+  "file": "extra-flat.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "4 channels, no layer section: the 4th is not alpha",
+  "expected": "extra-flat.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 255
+ },
+ "rgb8-p3": {
+  "file": "rgb8-p3.psd",
+  "reference": "magick",
+  "tolerance": 0,
+  "note": "ICC profile in image resource 1039 (pixels as stored)",
+  "expected": "rgb8-p3.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "rgb8-zip": {
+  "file": "rgb8-zip.psd",
+  "reference": "source",
+  "tolerance": 0,
+  "note": "ZIP, no prediction",
+  "expected": "rgb8-zip.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "rgb8-zip-pred": {
+  "file": "rgb8-zip-pred.psd",
+  "reference": "source",
+  "tolerance": 0,
+  "note": "ZIP with prediction",
+  "expected": "rgb8-zip-pred.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "rgb16-zip-pred": {
+  "file": "rgb16-zip-pred.psd",
+  "reference": "source",
+  "tolerance": 0,
+  "note": "16-bit ZIP with prediction",
+  "expected": "rgb16-zip-pred.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "rgb32": {
+  "file": "rgb32.psd",
+  "reference": "source",
+  "tolerance": 1,
+  "note": "32-bit float, linear light, raw",
+  "expected": "rgb32.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "rgb32-zip-pred": {
+  "file": "rgb32-zip-pred.psd",
+  "reference": "source",
+  "tolerance": 1,
+  "note": "32-bit float, ZIP with prediction (byte planes)",
+  "expected": "rgb32-zip-pred.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": null
+ },
+ "duotone": {
+  "file": "duotone.psd",
+  "reference": "source",
+  "tolerance": 0,
+  "note": "Duotone shown as its grey channel",
+  "expected": "duotone.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 0
+ },
+ "lab8": {
+  "file": "lab8.psd",
+  "reference": "LittleCMS",
+  "tolerance": 3,
+  "note": "Lab D50 to sRGB",
+  "expected": "lab8.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 255
+ },
+ "no-composite": {
+  "file": "no-composite.psd",
+  "reference": "layers",
+  "tolerance": 2,
+  "note": "resource 1057 hasRealMergedData = 0: rebuilt from the layers (approximate)",
+  "expected": "no-composite.rgba.gz",
+  "width": 48,
+  "height": 32,
+  "pillow": 255
+ }
+}

@@ -1,4 +1,4 @@
-// Tests for the input-format pages that read files browsers cannot open: camera RAW (raw/cr2/cr3/nef-to-jpg).
+// Tests for the input-format pages that read files browsers cannot open: camera RAW (raw/cr2/cr3/nef-to-jpg) and Photoshop PSD (psd-to-png/jpg).
 //   node --test tests/input-pages.test.mjs
 // Builds dist/, serves it on a random localhost port and checks the pages in headless Chromium.
 import { test, before, after } from 'node:test';
@@ -157,5 +157,61 @@ test('raw-to-jpg: CR2 (one row, not TIFF pages), CR3, RAF with its own EXIF rota
   const dng = await resultInfo(page, 3); // orientation 3 = 180°: white|blue over lime|red
   [WHITE, BLUE, LIME, RED].forEach((rgb, i) => assert.ok(near(dng.q[i], rgb), `DNG quadrant ${i}: ${dng.q[i]}`));
   assert.match(await page.locator('#results li').nth(4).textContent(), /no embedded JPEG preview/);
+  await close();
+});
+
+const PSD_DIR = join(ROOT, 'tests/fixtures/psd');
+const psdManifest = JSON.parse(await readFile(join(PSD_DIR, 'manifest.json'), 'utf8'));
+
+test('psd-to-png: P3 PSD → sRGB PNG with alpha via the worker; a PSD without a flattened copy is rebuilt and flagged', async () => {
+  const { page, errors, close } = await open(`${BASE_PATH}/psd-to-png/`);
+  await page.setInputFiles('#file', ['rgba8', 'rgb8-p3', 'no-composite', 'psb-rgb8'].map((k) => join(PSD_DIR, psdManifest[k].file)));
+  await waitForRows(page, 4);
+  const rows = page.locator('#results li');
+  assert.deepEqual(await rows.evaluateAll((lis) => lis.map((li) => li.dataset.state)), ['done', 'done', 'done', 'done']);
+  assert.equal(await rows.nth(0).locator('a.btn').getAttribute('download'), psdManifest.rgba8.file.replace(/\.psd$/, '.png'));
+  assert.match(await rows.nth(0).textContent(), /PSD .* → PNG .*48 × 32 px/);
+  assert.match(await rows.nth(3).textContent(), /PSB .* → PNG/);
+  // Pixels of the PNG against the decoder's expected RGBA (ImageMagick reference, gzipped in the fixtures).
+  const { gunzipSync } = await import('node:zlib');
+  for (const [index, key] of [[0, 'rgba8'], [3, 'psb-rgb8']]) {
+    const want = gunzipSync(await readFile(join(PSD_DIR, psdManifest[key].expected)));
+    const got = await page.evaluate(async (i) => {
+      const img = document.querySelectorAll('#results .thumb')[i];
+      await img.decode();
+      const c = Object.assign(document.createElement('canvas'), { width: img.naturalWidth, height: img.naturalHeight });
+      const g = c.getContext('2d', { colorSpace: 'srgb' });
+      g.drawImage(img, 0, 0);
+      return [...g.getImageData(0, 0, c.width, c.height).data];
+    }, index);
+    assert.equal(got.length, want.length, key);
+    let bad = 0;
+    for (let i = 0; i < want.length; i += 4) {
+      if (want[i + 3] === 0 && got[i + 3] === 0) continue; // colour of invisible pixels is free
+      for (let k = 0; k < 4; k++) if (Math.abs(got[i + k] - want[i + k]) > 3) bad++;
+    }
+    assert.equal(bad, 0, `${key}: ${bad} channel values differ by more than 3`);
+  }
+  // The P3 file is converted to sRGB: its pixels must differ from the stored (unconverted) values.
+  const stored = gunzipSync(await readFile(join(PSD_DIR, psdManifest['rgb8-p3'].expected)));
+  const p3 = (await resultInfo(page, 1)).q[0];
+  const raw = [...stored.subarray(((8 * 48) + 12) * 4, ((8 * 48) + 12) * 4 + 3)];
+  assert.notDeepEqual(p3, raw, `P3 pixels converted (got ${p3}, stored ${raw})`);
+  assert.match(await rows.nth(2).textContent(), /rebuilt from the layers/);
+  assert.doesNotMatch(await rows.nth(0).textContent(), /rebuilt from the layers/);
+  assert.deepEqual(errors, []);
+  await close();
+});
+
+test('psd-to-jpg: a broken PSD shows an error row, the others still convert', async () => {
+  const { page, close } = await open(`${BASE_PATH}/psd-to-jpg/`);
+  const good = await readFile(join(PSD_DIR, psdManifest['rgb8-rle'].file));
+  await page.setInputFiles('#file', [file('cover.psd', good), file('broken.psd', good.subarray(0, 200))]);
+  await waitForRows(page, 2);
+  const rows = page.locator('#results li');
+  assert.equal(await rows.nth(0).getAttribute('data-state'), 'done');
+  assert.equal(await rows.nth(0).locator('a.btn').getAttribute('download'), 'cover.jpg');
+  assert.equal(await rows.nth(1).getAttribute('data-state'), 'error');
+  assert.ok((await rows.nth(1).textContent()).length > 'broken.psd'.length + 10, 'error row has a message');
   await close();
 });

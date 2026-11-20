@@ -43,6 +43,7 @@ export function sniffType(bytes) {
   }
   if (at(0, 0x49, 0x49, 0x2a, 0x00) || at(0, 0x4d, 0x4d, 0x00, 0x2a) || at(0, 0x49, 0x49, 0x2b, 0x00) || at(0, 0x4d, 0x4d, 0x00, 0x2b)) return 'tiff';
   if (ascii(0, Math.min(b.length, 1024)).includes('%PDF-')) return 'pdf'; // header may follow a few junk bytes
+  if (ascii(0, 4) === '8BPS') return 'psd'; // Photoshop PSD/PSB (the site decodes it)
   if (at(0, 0x42, 0x4d)) return 'bmp';
   if (at(0, 0x00, 0x00, 0x01, 0x00)) return 'ico';
   if (at(0, 0xff, 0x0a) || ascii(4, 4) === 'JXL ') return 'jxl';
@@ -165,7 +166,7 @@ export async function convertBlob(input, formatId, options = {}) {
       return [c, g];
     };
     const [canvas, ctx] = render(out.width, out.height);
-    const base = { width: out.width, height: out.height, sourceKind: img.kind, sourceWidth: img.width, sourceHeight: img.height, resized };
+    const base = { width: out.width, height: out.height, sourceKind: img.kind, sourceWidth: img.width, sourceHeight: img.height, resized, ...(img.approximate ? { approximate: true } : {}) };
     const targetBytes = options.targetBytes > 0 && (fmt.lossy || formatId === 'png') && formatId !== 'pdf' ? Math.round(options.targetBytes) : 0;
     if (targetBytes) {
       const r = await fitToBytes(render, canvas, ctx, out, fmt, targetBytes, { ...options, quality });

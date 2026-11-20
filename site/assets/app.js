@@ -10,10 +10,11 @@ import { decodeHeic } from './heic.js';
 import { decodeTiff, tiffPageCount } from './tiff-client.js';
 import { decodePdf, pdfPageCount, closePdf } from './pdf-client.js';
 import { isRaw, decodeRaw } from './raw.js';
+import { decodePsd } from './psd-client.js';
 
 // Formats the browser may not decode itself. HEIC (iPhone photos) goes to a WebAssembly
 // decoder that is only downloaded when the first HEIC file is added; TIFF to our own decoder.
-const FALLBACK_DECODERS = { heic: decodeHeic, tiff: decodeTiff, pdf: (b) => decodePdf(b, 0) };
+const FALLBACK_DECODERS = { heic: decodeHeic, tiff: decodeTiff, pdf: (b) => decodePdf(b, 0), psd: decodePsd };
 const MAX_TIFF_PAGES = 500;
 const MAX_PDF_PAGES = 500;
 
@@ -187,6 +188,7 @@ function init(root) {
     // Camera RAW first: CR2, NEF, ARW, DNG, ... look like TIFF but must not be split into pages.
     if (isRaw(head, file.name)) return [{ file, label: file.name, raw: true, outName: file.name.replace(/\.[^.]*$/, '') || 'photo' }];
     const kind = sniffType(head);
+    if (kind === 'psd') return [{ file, label: file.name, outName: file.name.replace(/\.ps[db]$/i, '') || 'image' }];
     if (kind !== 'tiff' && kind !== 'pdf') return [{ file, label: file.name }];
     const pdf = kind === 'pdf';
     let pages = 1;
@@ -372,6 +374,7 @@ function init(root) {
       const extra = [];
       if (r.quality != null && r.targetBytes && !r.keptOriginal) extra.push(` · quality ${Math.round(r.quality * 100)}%`);
       if (r.colors && !r.keptOriginal) extra.push(` · ${r.colors} colours`);
+      if (r.approximate) extra.push(' · ', Object.assign(el('span', 'warn'), { textContent: 'rebuilt from the layers (saved without Maximize Compatibility): effects and blend modes may be missing' }));
       if (r.sourceKind === 'raw') extra.push(' · ', Object.assign(el('span', 'raw-note'), { textContent: `from the camera’s built-in ${r.sourceWidth} × ${r.sourceHeight} JPEG`, title: 'RAW files carry a JPEG made by the camera; this page converts that picture and does not develop the sensor data.' }));
       if (r.targetBytes && r.targetMet === false) {
         extra.push(' · ', Object.assign(el('span', 'warn'), { textContent: `could not get under ${fmtBytes(r.targetBytes)}; this is the smallest version` }));

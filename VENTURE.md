@@ -169,6 +169,28 @@ PNG→PNG, WebP→WebP, HEIC→JPG, others→PNG) and keep the input file untouc
 `resize`, `targetBytes`, `pngColors` in `convertBlob` (`outputSize()` exported). New pages (subagent content): /compress-image/, /compress-jpg/,
 /compress-png/, /resize-image/, /compress-image-to-100kb/, /-50kb/, /-20kb/, listed under "Compress and resize" on /guides/. The extension
 does not use the new options; its `convert.js` now imports `png-quant.js` (extension tests passed with it in CI; not repacked or uploaded).
+**Camera RAW input (session 12):** every converter page takes RAW files (CR2, CR3, NEF/NRW, ARW, DNG, RAF, ORF, RW2, PEF, SRW and
+other TIFF-shaped RAW by extension). `site/assets/raw.js` (own code) does **not** develop sensor data: it walks every `FF D8 FF` in the
+file, parses markers to the frame header, keeps baseline/progressive 8-bit frames (lossless SOF3 = sensor data, skipped), takes the one
+with most pixels, and applies the container's EXIF orientation (TIFF IFD0, or CR3's CMT1 box) only when that JPEG has none. RAW is
+detected in `app.js` *before* `sniffType` (CR2/NEF/… have TIFF magic and would otherwise become TIFF page rows); rows say "from the
+camera's built-in W × H JPEG". `convert.js` `decode()` gained a `decoder` override for this. Checked against LibRaw (rawpy 0.28,
+`extract_thumb`) on 12 real files from raw.pixls.us: same size on all 12 — full size for Canon 5D III/7D CR2, R10 CR3, Nikon D750/Z 6 NEF,
+Pentax K-1 PEF, iPhone 12 Pro DNG (portrait, upright); smaller for Fuji X-T3 RAF 4416×2944, Olympus E-M10 ORF 3200×2400, Panasonic GH4 RW2
+1920×1920, Sony A7 III ARW 1616×1080, Pixel 4a DNG 672×504. All 12 (≈360 MB) converted in 3.4 s in headless Chromium. New pages:
+/raw-to-jpg/, /cr2-to-jpg/, /cr3-to-jpg/, /nef-to-jpg/ (group "From camera RAW"); no /arw-to-jpg/ or /dng-to-jpg/ because those
+previews can be small.
+**PSD input (session 12, subagent decoder):** `site/assets/psd.js` + `psd-worker.js` + `psd-client.js` (own code, same shape as the TIFF
+decoder): PSD and PSB; raw / PackBits / ZIP (with prediction); 1/8/16/32-bit; Bitmap, Grey, Duotone, Multichannel, Indexed, RGB, CMYK
+(simple formula, no profile), Lab; ICC (1039) → sRGB; merged alpha only when the layer count is negative or an `Mtrn`/`Mt16`/`Mt32` block
+exists (spot channels/selections are not alpha), Photoshop's white matte removed. Without a flattened copy (resource 1057) it rebuilds
+from visible pixel layers (normal blend, opacity; no masks/effects) and the row warns "rebuilt from the layers". `sniffType` returns `psd`
+for `8BPS`. Cross-checked by the subagent on 348 Photoshop files from the psd-tools corpus (313 within 2 of ImageMagick; the rest are
+ImageMagick errors on 32-bit/Lab/grey-alpha, files with no composite, 1 truncated, 1 masked layer file). New pages /psd-to-png/, /psd-to-jpg/.
+**Not verified (session 12):** RAW/PSD in Firefox and Safari (Chromium only); RAW with an Adobe RGB preview (would look muted; untested);
+CR3 shot in HDR PQ / HEIF mode (preview may be HEIF, not JPEG → probably the 1620 px or 160 px JPEG or an error); NRW, SRW, X3F, MRW
+(no samples); real Photoshop CMYK files with transparency; PSD files of hundreds of MB (whole file held in memory, plus RGBA).
+Search demand for the 6 pages was not sourced (web search returned competitor pages, no volumes).
 **PDF input (session 11):** every converter page now takes PDF files: each page becomes one row (`name (page k of N)`, output
 `name-page-k.ext`, up to 500 pages), drawn by **PDF.js** (Mozilla's PDF engine, the one inside Firefox's viewer; npm `pdfjs-dist`
 6.5.438, Apache-2.0, vendored unmodified in `site/vendor/pdfjs/` with SHA-256 in its README; the two `.mjs` files renamed `.js` for
@@ -194,7 +216,7 @@ jfif→jpg/png, image→pdf, favicon generator),
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 61 URLs (session 11: +3 PDF pages; session 8: +3 TIFF pages, +/guides/; session 9: +4 →TIFF pages, +1 guide; session 10: +7 compress/resize pages). Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 67 URLs (session 12: +4 RAW, +2 PSD pages; session 11: +3 PDF pages; session 8: +3 TIFF pages, +/guides/; session 9: +4 →TIFF pages, +1 guide; session 10: +7 compress/resize pages). Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -396,6 +418,12 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    largest converter queries, but the field is dominated by big upload-based sites; demand volume was not fetched this session); then
    /pdf-to-webp/ and a "PDF to image" page; a page-range field for long PDFs; CCITT G4 TIFF output would make /pdf-to-tiff/ fit fax systems;
    check pdf.js on scanned PDFs with JBIG2/JPEG 2000 images (only text, vector and DCT-image PDFs were tried).
+4a4. RAW/PSD follow-ups (session 12): watch GSC for the 4 RAW and 2 PSD URLs from December. RAW: a real **DNG developer** (DNG is
+   self-describing: CFA pattern, linearization, BlackLevel/WhiteLevel, AsShotNeutral, ColorMatrix/ForwardMatrix, so no per-camera tables
+   are needed) would fix small DNG previews (Pixel) and justify /dng-to-jpg/; ARW/RW2 full resolution would need per-camera colour
+   matrices (only from a source whose licence allows it, or measured ourselves), so do not promise it. Option to keep the camera JPEG
+   bytes unchanged (no re-encode) when the output is JPG with no resize. Test a CR3 shot in HDR PQ mode. PSD: "export each layer"
+   as a ZIP (common request on PSD converters), /psd-to-webp/ and /psd-to-pdf/ if the two PSD pages get impressions.
 4b. Real-photo coverage: try an HDR iPhone photo (gain map) and a 48 MP HEIC (memory/time), e.g. from libheif's or Apple's public samples.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,

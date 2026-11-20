@@ -95,7 +95,7 @@ function toolHtml(page) {
       ${ICON_UPLOAD}
       <span class="drop-title">Drop ${esc(fromLabel)} here</span>
       <span class="drop-sub"><span class="linkish">or choose files</span> · or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
-      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff,.pdf,application/pdf,.cr2,.cr3,.nef,.nrw,.arw,.dng,.raf,.orf,.rw2,.pef,.srw">
+      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff,.pdf,application/pdf,.cr2,.cr3,.nef,.nrw,.arw,.dng,.raf,.orf,.rw2,.pef,.srw,.psd,.psb">
     </label>
     <div class="controls">
       <label class="control" for="format"><span>Convert to</span><select id="format">${opts}</select></label>
@@ -429,6 +429,9 @@ async function main() {
     copyFile(join(SITE, 'assets/tiff-client.js'), join(DIST, 'assets/tiff-client.js')),
     copyFile(join(SITE, 'assets/pdf-client.js'), join(DIST, 'assets/pdf-client.js')),
     copyFile(join(SITE, 'assets/raw.js'), join(DIST, 'assets/raw.js')),
+    copyFile(join(SITE, 'assets/psd.js'), join(DIST, 'assets/psd.js')),
+    copyFile(join(SITE, 'assets/psd-worker.js'), join(DIST, 'assets/psd-worker.js')),
+    copyFile(join(SITE, 'assets/psd-client.js'), join(DIST, 'assets/psd-client.js')),
     copyFile(join(SITE, 'assets/icc.js'), join(DIST, 'assets/icc.js')),
     copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
