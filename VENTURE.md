@@ -85,13 +85,14 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
 
 Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Format" is an existing listing, so not used).
 
-**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.0):
+**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.1):
 - Right-click image → Save image as → PNG / JPG / WebP / PDF (AVIF only where the browser's canvas can
   write it; Chrome 159 cannot, so not shown there) / Copy as PNG. PDF (added in v0.2.0) = one page, page size
   set in settings (same as image by default, or A4 / US Letter), JPEG quality shared with JPG.
 - **Save all images on a page (v0.4.0, session 5):** toolbar button / Alt+Shift+S opens a popup (`popup.html/js/css`) that
   lists the page's images (`lib/collect.js`: `<img>` with the largest `srcset` w-candidate, SVG `<image>`, video posters, CSS
-  backgrounds; up to 500), with a size filter (default: hide < 100 px), select all/none, format PNG/JPG/WebP/(AVIF)/original,
+  backgrounds; since 0.4.1 also lazy-loaded `<img>` not loaded yet: `data-src`, `data-lazy-src`, `data-original`, `data-lazy`,
+  `data-srcset`, `data-lazy-srcset`, `<picture><source>`; up to 500), with a size filter (0×0 = unknown size, never hidden) (default: hide < 100 px), select all/none, format PNG/JPG/WebP/(AVIF)/original,
   output separate files / one ZIP / one PDF. The batch runs in the background (`startBatch`/`continueBatch` in `background.js`)
   so it survives the popup closing; sites that refuse extension reads are listed once with Allow / Skip so a ZIP or PDF stays
   one file (Firefox: `permissions.onAdded` continues the batch if the popup closed during the prompt). Shared code moved to
@@ -104,8 +105,8 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
   settings page (quality, Save dialog on/off, file name pattern, Downloads subfolder, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.0-chrome.zip` and
-  `packages/saveform-0.4.0-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.1-chrome.zip` and
+  `packages/saveform-0.4.1-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
   offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
@@ -114,12 +115,12 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   superseded unreviewed 0.1.0 file is now `disabled`). The first attempt got HTTP 429 (throttled ~45 min); the retry worked.
   `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
 - **Chrome Web Store: uploaded as a draft, waiting for the operator.** The API works since 2026-11-20 (session 4):
-  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.0 uploaded in session 5 (`--status`: crxVersion 0.4.0).
+  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.1 uploaded in session 6 (`--status`: crxVersion 0.4.1).
   `cws-upload.py --publish` returns 400 listing exactly what the dashboard still needs (contact email + verification,
   language, category, icon, screenshot, description, Privacy practices). Text and files for every field: `store/chrome-privacy.md` (inbox line filed).
 - **AMO v0.3.0 submitted 2026-11-20** (version id 6737975, file `unreviewed`; 0.2.0 file now `disabled`). The listing-text PATCH
   that follows was throttled (429, ~23 h); retry with `python3 scripts/amo-submit.py --listing`.
-- **AMO v0.4.0 NOT yet submitted:** upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
+- **AMO v0.4.0/0.4.1 NOT yet submitted** (0.4.1 is the one to submit; 0.4.0 never reached AMO): upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
   (≈ 2026-11-21 12:25 UTC). Re-run `python3 scripts/amo-submit.py` (it adds the version and PATCHes the new listing text).
 - **v0.3.0 (session 4):** settings for a file name pattern (`{name}`, `{site}`, `{date}`, `{time}`, `{width}`, `{height}`;
   default `{name}`) and a folder inside Downloads (`buildFilename()` in `extension/lib/filename.js`; separators, `..` and
@@ -198,6 +199,25 @@ as in the earlier field test). Popup screenshot looked right after fixing a grid
 (mentions the toolbar list), `/extension/` return 200; sitemap 35 <loc>; live /webp-to-gif/ in headless Chromium wrote
 `grad.gif` (GIF89a, 120×80, transparent half kept), 0 console errors, no requests outside github.io.
 
+**Verified (2026-11-20, session 6):** `npm test` 72/72 in GitHub Actions run 44751383003 on commit 87b043e (0 skipped; Chromium +
+Firefox; run 44750918433 on 3264307: 69/69), and 74/74 locally on the merged tree with 0.4.1 (adds the lazy-image collector test
+and a popup test for 0×0 images). New HEIC cases: heic→jpg colours of 4 quadrants, decoder fetched only after a HEIC is added;
+tile grid + `irot` gives 96×128 with the right quadrant colours (Chromium and real Firefox 158/160 via `tests/firefox-site.test.mjs`);
+2 HEICs → 2-page PDF; truncated HEIC → error row; the index page and the guide's embedded converter take HEIC. Fixtures checked
+independently: ffmpeg 8.0.1 decodes `quadrants.heic` to the 4 colours and each grid tile in order (its own grid composition is
+wrong, see memory). A real HEIC (libheif's `examples/example.heic`, 1280×854, 2 images + thumbnails): primary image picked, 342 ms
+locally, RMSE 0.68% against ffmpeg's decode. Live after Pages runs 44750918167 and 44751383097: the 3 pages, the guide, `heic.js`,
+`heic-worker.js`, `libheif.js`, `libheif.wasm` (application/wasm, 490 KB gzipped), LICENSE return 200; sitemap 39 <loc>; live
+/heic-to-jpg/ converted the real sample + the grid fixture in 434 ms including the decoder download, 0 console errors, requests only
+to janwan2003.github.io; JPG vs ffmpeg decode RMSE 1.8% (JPEG q90). Screenshot of /heic-to-jpg/ (light, 1100 px) looked right.
+`web-ext lint` on the 0.4.1 Firefox zip: 0 errors, 1 warning (UNSUPPORTED_API, offscreen). IndexNow 39 URLs (HTTP 200), sitemap
+resubmitted (204).
+**Not verified (session 6):** HEIC files straight from a current iPhone (10-bit, HDR gain maps, Display P3 colour: only the
+synthetic fixtures and libheif's sample were tried; wide colour is converted without colour management); very large HEICs
+(48 MP: memory); Safari (it decodes HEIC natively, so the wasm path is not used there, untested); lazy-image collection on real
+sites (only a test page). The Windows claims in the HEIC guide come from Microsoft support pages as quoted by search results
+(HEIF Image Extensions free, HEVC Video Extensions paid), not from a Windows machine.
+
 **Not verified:** the popup opened by a real toolbar click and the real Chrome/Firefox permission prompt from the popup (tests
 open popup.html?tabId= in a tab and pre-grant the page origin); Firefox closing the popup during the prompt (the onAdded path is
 untested); very large batches (memory: all fetched blobs are held until saving; a ZIP is passed to downloads as a data: URL in
@@ -211,28 +231,31 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
 ## Next steps
 
 1. **Operator:** fill the Chrome Web Store dashboard for draft item `iimmananoageikphanfidapckaochlmn` (every field's text and
-   file in `store/chrome-privacy.md`, updated for 0.4.0; inbox line 2026-11-20). Then run `python3 scripts/cws-upload.py --publish`;
+   file in `store/chrome-privacy.md`; draft holds 0.4.1; inbox line 2026-11-20; `--publish` still returns 400 listing the fields, 2026-11-20 session 6). Then run `python3 scripts/cws-upload.py --publish`;
    the reply lists anything still missing. Afterwards: CWS link on `site/content/extension.html` and in `calloutHtml()`.
-2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.0 and PATCHes the listing text; if the listing PATCH is
+2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.1 and PATCHes the listing text; if the listing PATCH is
    throttled again, `--listing` later). Check the review (`--status`); when approved, add the AMO link to the site and start AMO metrics.
 3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
-   put effort into the page types that get impressions. Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
+   put effort into the page types that get impressions (compare the 4 HEIC URLs, added 2026-11-20, against the WebP ones). Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
 4. New store screenshot showing the save-all popup (`docs/store/`, made by `scripts/store-assets.mjs`) and upload it with the
    listing; the popup is the clearest difference from the 400K-user PNG-only competitor.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
    images inside same-origin iframes, lazy CSS backgrounds (`data-bg`-style attributes) and `<noscript>` fallbacks.
-   Done (unreleased, after 0.4.0): not-yet-loaded lazy `<img>` (data-src / data-lazy-src / data-original / data-lazy,
+   Done in 0.4.1 (CWS draft; AMO pending): not-yet-loaded lazy `<img>` (data-src / data-lazy-src / data-original / data-lazy,
    data-srcset / data-lazy-srcset, `<picture><source>`), listed as unknown size when they have no size attributes.
-7. More search pages: heic→jpg/png (largest volume; needs a WASM decoder: `libheif-js` 1.23.5 is LGPL-3.0, 9 MB unpacked, and
-   no HEIC encoder exists on this machine for a test fixture: ImageMagick here reads HEIC but cannot write it, so a public
-   sample with a clear licence is needed), avif→webp (needs an AVIF fixture), "save image as jpg in
+7. More search pages: heic→webp/png variants are cheap now (HEIC decoding done in session 6); avif→webp (ImageMagick here can
+   write AVIF, so a fixture is possible); "save image as jpg in
    firefox/edge" guides, a "download all images from a page" guide pointing at the popup. Check the guides' unsourced claims
    (macOS Preview export, CDN `format=`/`fm=`).
 8. Features: Firefox-only "Save background image" via `menus.getTargetElement` (Chrome has no equivalent without all-sites
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-20 (session 6): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
+  CWS draft crxVersion 0.4.1, `--publish` 400 (dashboard fields missing). `gsc.py status`: sitemap pending, 0 errors/warnings,
+  no search analytics rows for 2026-10-23..2026-11-20.
 
 - 2026-11-20 (session 5): no users yet (AMO `nominated`, `--status`; CWS draft, `cws-upload.py --status`). GSC data not
   expected before ~2026-12-04; not queried this session.
@@ -278,3 +301,8 @@ The site's converter pages could later carry one unobtrusive ad slot.
   CWS draft updated to 0.4.0; AMO 0.4.0 validated but throttled (retry ≥ 2026-11-21 12:30 UTC); IndexNow 35 URLs (HTTP 200),
   sitemap resubmitted (204). Evidence: Actions run 44748850979 65/65, Pages run 44748850990, live webp→gif conversion, field
   check on 10 real sites (8 saved, 2 headless-blank), web-ext lint 0 errors.
+- 2026-11-20 builder (session 6): HEIC input on the site (libheif WebAssembly in a worker, vendored LGPL build) + /heic-to-jpg/,
+  /heic-to-png/, /heic-to-pdf/ and a "open HEIC on Windows" guide (sitemap 35 → 39); own HEIF writer for test fixtures; Firefox site
+  test; save-all finds lazy-loaded images (subagent) → v0.4.1 uploaded to the CWS draft (AMO throttled until 2026-11-21);
+  `cws-upload.py --status` no longer needs the zip. Evidence: Actions runs 44750918433 (69/69) and 44751383003 (72/72), local 74/74,
+  Pages runs 44750918167/44751383097, live HEIC conversion (434 ms, github.io only), IndexNow 39 URLs, web-ext lint 0 errors.
