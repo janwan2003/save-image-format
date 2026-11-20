@@ -4,8 +4,8 @@
 
 | Store | Package | State | How |
 |---|---|---|---|
-| Firefox AMO | `packages/saveform-0.2.0-firefox.zip` | submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
-| Chrome Web Store | `packages/saveform-0.2.0-chrome.zip` | not uploaded: Chrome Web Store API disabled in the Google Cloud project (see OPERATOR-INBOX.md) | `python3 scripts/cws-upload.py` once enabled |
+| Firefox AMO | `packages/saveform-0.3.0-firefox.zip` | 0.3.0 submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
+| Chrome Web Store | `packages/saveform-0.3.0-chrome.zip` | 0.3.0 uploaded as draft item `iimmananoageikphanfidapckaochlmn`; publishing waits for the operator to fill the dashboard (`store/chrome-privacy.md`) | `python3 scripts/cws-upload.py` (`--publish`, `--status`) |
 | Edge Add-ons | same Chrome zip | needs a Partner Center account (operator) | dashboard upload |
 
 Build both zips with `node scripts/pack-extension.mjs`. The AMO listing text lives in `scripts/amo-submit.py`

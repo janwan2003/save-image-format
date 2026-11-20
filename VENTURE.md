@@ -80,7 +80,7 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
 
 Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Format" is an existing listing, so not used).
 
-**Extension** (`extension/`, MV3, no build step, no dependencies, v0.2.0):
+**Extension** (`extension/`, MV3, no build step, no dependencies, v0.3.0):
 - Right-click image → Save image as → PNG / JPG / WebP / PDF (AVIF only where the browser's canvas can
   write it; Chrome 159 cannot, so not shown there) / Copy as PNG. PDF (added in v0.2.0) = one page, page size
   set in settings (same as image by default, or A4 / US Letter), JPEG quality shared with JPG.
@@ -90,10 +90,10 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   fetch from inside the page (cookies/referrer; `blob:` URLs) → popup asking for access to that one
   image host (optional host permission, revocable in settings). Install warning is only "Manage your downloads".
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
-  settings page (quality, Save dialog on/off, granted sites); errors shown as an in-page notice.
+  settings page (quality, Save dialog on/off, file name pattern, Downloads subfolder, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.2.0-chrome.zip` and
-  `packages/saveform-0.2.0-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.3.0-chrome.zip` and
+  `packages/saveform-0.3.0-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
   offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
@@ -101,17 +101,28 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   **v0.2.0 (PDF) submitted 2026-11-20** (AMO version id 6737926, file `unreviewed`, add-on still `nominated`; the
   superseded unreviewed 0.1.0 file is now `disabled`). The first attempt got HTTP 429 (throttled ~45 min); the retry worked.
   `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
-- **Chrome Web Store: blocked.** `scripts/cws-upload.py` gets a valid token but the upload returns 403 SERVICE_DISABLED:
+- **Chrome Web Store: uploaded as a draft, waiting for the operator.** The API works since 2026-11-20 (session 4):
+  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.3.0 uploaded (`uploadState: SUCCESS`).
+  `cws-upload.py --publish` returns 400 listing exactly what the dashboard still needs (contact email + verification,
+  language, category, icon, screenshot, description, Privacy practices). Text and files for every field: `store/chrome-privacy.md` (inbox line filed).
+- **AMO v0.3.0 submitted 2026-11-20** (version id 6737975, file `unreviewed`; 0.2.0 file now `disabled`). The listing-text PATCH
+  that follows was throttled (429, ~23 h); retry with `python3 scripts/amo-submit.py --listing`.
+- **v0.3.0 (session 4):** settings for a file name pattern (`{name}`, `{site}`, `{date}`, `{time}`, `{width}`, `{height}`;
+  default `{name}`) and a folder inside Downloads (`buildFilename()` in `extension/lib/filename.js`; separators, `..` and
+  reserved names are cleaned).
+- **Search:** site verified in Google Search Console on 2026-11-20 (`scripts/gsc.py verify`: siteOwner) and `sitemap.xml`
+  submitted (`gsc.py sitemap`; state pending). Ownership file and IndexNow key live in `site/verify/` and are copied to the
+  site root. `scripts/indexnow.py` pushes every sitemap URL to IndexNow (Bing, Yandex, Seznam, Naver; no account).
   the Chrome Web Store API is not enabled in the operator's Google Cloud project (inbox request filed 2026-11-20).
 
-**Website** (live, https://janwan2003.github.io/save-image-format/): 22 converter pages (index,
-webp→png/jpg/pdf, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf, svg→png/jpg, gif→png/jpg, bmp→png/jpg, ico→png,
-jfif→jpg/png),
+**Website** (live, https://janwan2003.github.io/save-image-format/): 27 converter pages (index,
+webp→png/jpg/pdf/ico, avif→png/jpg, png→webp/jpg/pdf/ico, jpg→webp/png/pdf/ico, svg→png/jpg/ico, gif→png/jpg, bmp→png/jpg, ico→png,
+jfif→jpg/png, image→pdf, favicon generator),
 3 guides (/how-to-save-webp-as-png/, /why-images-save-as-webp/, /save-image-as-type-alternative/), plus privacy, extension and 404 pages;
 batch convert, paste, ZIP download, no external requests, same engine (`extension/lib/convert.js`)
 as the extension. Every converter page can also output PDF (page size A4 / US Letter / same as image; "Download one PDF"
 combines all rows in list order; ↑/↓ buttons reorder) and ICO (pick sizes 16–256 px). jfif→jpg keeps the JPEG bytes
-unchanged by default (rename only). Sitemap with 27 URLs. Deployed by `.github/workflows/pages.yml`.
+unchanged by default (rename only). Sitemap with 32 URLs. Deployed by `.github/workflows/pages.yml`.
 
 **Verified (2026-11-20):**
 - `npm test`: 24/24 pass locally and in GitHub Actions (run 44731849970, ubuntu, Chromium 159):
@@ -139,30 +150,45 @@ Live after Pages run 44737512247: `/`, the 6 new pages, `/lib/pdf.js`, `/extensi
 (portrait + landscape A4, rendered by poppler), 0 console errors, 0 requests outside github.io.
 Visual check: screenshots of /jpg-to-pdf/ (light) and /png-to-ico/ (dark) with two files added looked right.
 
-**Not verified:** Firefox with a real context-menu click and the real per-site permission prompt, the real Chrome permission prompt (cannot be
+**Verified (2026-11-20, session 4):** `npm test` 48/48 in GitHub Actions run 44746561369 (0 skipped; Chromium + Firefox) on
+commit a79877a. New cases: file name pattern + subfolder (unit test of `buildFilename`; Chromium returns
+`Saveform/web/127.0.0.1 64x48 photo.png`; in real Firefox 158 the file landed on disk at `Saveform/web/64x48 same.png`),
+settings page saves the two new text fields, the 5 new pages (title/h1/canonical/sitemap; favicon 16/32/48 + 256; PNG + WebP
+combined into a 2-page PDF rendered by poppler; svg/webp/jpg→ico). `web-ext lint` on the 0.3.0 Firefox zip: 0 errors, 1 warning
+(offscreen). Live after Pages run 44746561233: the 5 new URLs, `/sitemap.xml` (32 <loc>), the Google ownership file and the
+IndexNow key return 200; live /favicon-generator/ in headless Chromium wrote `logo.ico` with 16/32/48 entries and live
+/image-to-pdf/ combined two PNGs into a 2-page `a-and-1-more.pdf`, 0 console errors, 0 requests outside github.io.
+Visual check: settings page screenshot (light) looked right; the subagent checked /favicon-generator/ (light) and /image-to-pdf/
+(390 px, dark).
+
+**Not verified:** the new settings in real Chrome with a real menu click (Playwright saves under GUID names, so the
+on-disk subfolder was only checked in Firefox); the favicon pages' general claims (browsers request /favicon.ico by default,
+favicon caching) are from general knowledge, not checked against browser docs. Firefox with a real context-menu click and the real per-site permission prompt, the real Chrome permission prompt (cannot be
 automated; the test pre-grants access), logged-in sites (Instagram, X, Facebook), images in
 cross-origin iframes, Google Images thumbnails, AVIF output. PDFs opened in Adobe Reader or macOS Preview (only poppler
 and our own parser checked them). ICO files opened in Windows Explorer (only Chromium decoded them).
 
 ## Next steps
 
-1. **Operator:** enable the Chrome Web Store API in Google Cloud project 964988236925 (OPERATOR-INBOX.md, 2026-11-20).
-   Then run `python3 scripts/cws-upload.py`, and the operator fills the listing in the dashboard once (`STORE.md`, `docs/store/`).
-2. Check the AMO review of 0.2.0 (`python3 scripts/amo-submit.py --status`). When approved: put the AMO link on
-   `site/content/extension.html` and in `calloutHtml()` in `scripts/build-site.mjs`, update the guide in `site/guides.mjs`,
-   and start recording AMO users/ratings in `## Metrics`. If rejected, read the reviewer's note and resubmit.
-3. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
-4. Features users of the old extension expect: "Save as" for page background images, keyboard
-   shortcut, optional filename pattern; "save all images on page" (a later premium candidate).
-5. More search pages: image→pdf / "combine images into PDF", jpg→ico, svg→ico, heic→jpg (needs a WASM decoder; check the
-   licence first), avif→webp (needs an AVIF fixture), png/jpg→avif once Chrome can encode AVIF; "save image as jpg
-   firefox"/"edge" guides. Check the guides' unsourced claims (macOS Preview export, CDN `format=`/`fm=` parameters).
-6. Search Console / Bing Webmaster sitemap submission (needs the operator's account).
+1. **Operator:** fill the Chrome Web Store dashboard for draft item `iimmananoageikphanfidapckaochlmn` (every field's text and
+   file in `store/chrome-privacy.md`; inbox line 2026-11-20). Then run `python3 scripts/cws-upload.py --publish`; the reply
+   lists anything still missing. Afterwards: CWS link on `site/content/extension.html` and in `calloutHtml()`.
+2. Retry the AMO listing text after the throttle ends (~2026-11-21 13:40 UTC): `python3 scripts/amo-submit.py --listing`.
+   Check the review (`--status`); when approved, add the AMO link to the site as in step 1 and start AMO metrics.
+3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
+   put effort into the page types that get impressions. Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
+4. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
+5. Features: "save all images on page" (premium candidate), keyboard shortcut; Firefox-only "Save background image"
+   via `menus.getTargetElement` (Chrome has no equivalent without all-sites access, which we refuse).
+6. More search pages: heic→jpg/png (largest volume; needs a WASM decoder: `libheif-js` 1.23.5 is LGPL-3.0, 9 MB unpacked, and
+   no HEIC encoder exists on this machine for a test fixture: ImageMagick here reads HEIC but cannot write it, so a public
+   sample with a clear licence is needed), avif→webp (needs an AVIF fixture), webp→gif (needs our own GIF encoder),
+   "save image as jpg in firefox/edge" guides. Check the guides' unsourced claims (macOS Preview export, CDN `format=`/`fm=`).
 
 ## Metrics
 
-No channel metrics yet (2026-11-20): AMO listing not public (status `nominated`, `amo-submit.py --status`), CWS not uploaded,
-site not in Search Console (needs operator). First readable numbers will be AMO users after approval.
+- 2026-11-20 (session 4): Search Console property added today; `gsc.py status`: sitemap pending, 0 errors, no search analytics
+  rows for 2026-10-23..2026-11-20. AMO: `nominated`, not public (`amo-submit.py --status`). CWS: draft, not public. No users yet.
 
 ## Monetization plan
 
@@ -191,3 +217,9 @@ The site's converter pages could later carry one unobtrusive ad slot.
   (v0.2.0), and 6 converter pages (jpg/png/webp→pdf, png→ico, jfif→jpg/png; sitemap 21 → 27 URLs). Evidence: `npm test` 41/41
   locally and in Actions run 44737512237; Pages run 44737512247; live jpg→pdf conversion rendered by poppler; web-ext lint 0
   errors. CWS upload re-tried: still 403 SERVICE_DISABLED. AMO: 0.2.0 first throttled (429), retried after 46 min → version 6737926 submitted, listing text updated (`--status`: current_version 0.2.0, file unreviewed).
+- 2026-11-20 builder (session 4): CWS API now works → uploaded Saveform as draft item iimmananoageikphanfidapckaochlmn (0.3.0)
+  and wrote every dashboard field into `store/chrome-privacy.md` (inbox); verified the site in Google Search Console and
+  submitted the sitemap (`scripts/gsc.py`); IndexNow submission of all 32 URLs (HTTP 202, `scripts/indexnow.py`); v0.3.0 adds
+  file name pattern + Downloads subfolder (AMO version 6737975 submitted; listing-text PATCH throttled); 5 new pages
+  (image→pdf, favicon generator, jpg/svg/webp→ico; sitemap 27 → 32). Evidence: Actions run 44746561369 48/48, Pages run
+  44746561233, live favicon/image-to-pdf conversions, web-ext lint 0 errors.
