@@ -26,7 +26,7 @@ https://janwan2003.github.io/save-image-format/
 | `downloads` | saves the converted file |
 | `activeTab` | when you click the menu, lets Saveform read that one image from the current site |
 | `scripting` | reads `blob:` images from inside the page, shows a short notice, and copies to the clipboard |
-| `storage` | remembers your settings (quality, Save dialog) |
+| `storage` | remembers your settings (quality, Save dialog, file name pattern, folder) |
 | `offscreen` | Chrome only: renders SVG images, which the background worker cannot draw |
 | optional host access | asked per site, only when an image server blocks cross-site reads |
 

@@ -6,6 +6,8 @@ export const DEFAULTS = {
   askWhere: true,       // show the Save As dialog
   svgMinSize: 1024,     // upscale small SVGs so the PNG is usable
   pdfPageSize: 'fit',   // 'fit' (page = image), 'a4' or 'letter'
+  namePattern: '{name}', // see buildFilename() in filename.js
+  subfolder: '',        // inside Downloads; '' = Downloads itself
 };
 
 export async function getSettings() {

@@ -1,7 +1,7 @@
 // Saveform background (Chrome: MV3 service worker; Firefox: event page).
 // Flow: context-menu click -> fetch the image bytes -> convert locally -> download or copy.
 import { FORMATS, convertBlob, canEncode } from './lib/convert.js';
-import { targetFilename } from './lib/filename.js';
+import { buildFilename } from './lib/filename.js';
 import { getSettings, optionsFor } from './lib/settings.js';
 
 const PARENT = 'saveform';
@@ -43,6 +43,7 @@ export async function handleClick(info, tab) {
   const job = {
     action, fmt,
     src: info.srcUrl,
+    pageUrl: info.pageUrl || tab?.url || '',
     tabId: tab?.id ?? -1,
     frameId: info.frameId ?? 0,
   };
@@ -73,7 +74,10 @@ export async function runJob(job, { allowGrant = false } = {}) {
     await notify(job.tabId, 'Image copied as PNG');
     return { ok: true, copied: true, width: out.width, height: out.height };
   }
-  const filename = targetFilename(job.src, fmt.ext);
+  const filename = buildFilename({
+    src: job.src, pageUrl: job.pageUrl, ext: fmt.ext, pattern: settings.namePattern,
+    subfolder: settings.subfolder, width: out.width, height: out.height,
+  });
   const downloadId = await saveBlob(out.blob, filename, settings.askWhere);
   return { ok: true, downloadId, filename, width: out.width, height: out.height, bytes: out.blob.size, type: out.blob.type };
 }

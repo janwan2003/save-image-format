@@ -13,6 +13,9 @@
 
   <h2>Saving</h2>
   <label><input type="checkbox" id="askWhere"> Ask where to save each file (shows the Save dialog)</label>
+  <label>File name <input type="text" id="namePattern" spellcheck="false" placeholder="{name}" style="width:16em"></label>
+  <p class="hint">Use <code>{name}</code> (from the image address), <code>{site}</code>, <code>{date}</code>, <code>{time}</code>, <code>{width}</code>, <code>{height}</code>. Example: <code>{site} {date} {name}</code> → <code>example.com 2026-11-20 photo.png</code>.</p>
+  <label>Save into this folder inside Downloads <input type="text" id="subfolder" spellcheck="false" placeholder="(Downloads itself)" style="width:16em"></label>
 
   <h2>Quality</h2>
   <label>JPG and PDF <input type="range" id="jpgQuality" min="10" max="100"> <output for="jpgQuality"></output></label>

@@ -28,6 +28,7 @@ Useful when "Save Image As…" gives you a .webp or .avif file that your editor,
 • PDF: one page, either the size of the image or A4 / US Letter with the image fitted.
 • Renders SVG images at a usable size (1024 px by default).
 • Choose JPG, PDF and WebP quality, and whether to see the Save dialog each time.
+• Name files your way ({site} {date} {name}, {width}x{height}, …) and save into a folder inside Downloads.
 • Open source (MIT): every file in the package can be checked against the GitHub source.
 
 Free online converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO and more, also in your browser): """ + SITE + """

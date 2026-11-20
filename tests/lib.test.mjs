@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { baseNameFromUrl, targetFilename } from '../extension/lib/filename.js';
+import { baseNameFromUrl, targetFilename, buildFilename } from '../extension/lib/filename.js';
 import { sniffType } from '../extension/lib/convert.js';
 
 test('filenames from URLs', () => {
@@ -29,4 +29,23 @@ test('sniffType recognises common formats', () => {
   assert.equal(sniffType(s('\0\0\0\x1cftypavif')), 'avif');
   assert.equal(sniffType(s('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>')), 'svg');
   assert.equal(sniffType(s('hello world')), null);
+});
+
+test('file name patterns and subfolders', () => {
+  const now = new Date(2026, 10, 5, 7, 8, 9);
+  const src = 'https://cdn.example.com/a/photo.jpg.webp';
+  const f = (o) => buildFilename({ src, ext: 'png', now, ...o });
+  assert.equal(f({}), 'photo.png');
+  assert.equal(f({ pattern: '' }), 'photo.png');
+  assert.equal(f({ pattern: '{site} {date} {time} {name}', pageUrl: 'https://www.shop.example/p/1' }),
+    'shop.example 2026-11-05 07-08-09 photo.png');
+  assert.equal(f({ pattern: '{site}-{name}' }), 'cdn.example.com-photo.png', 'site falls back to the image host');
+  assert.equal(f({ pattern: '{name}_{width}x{height}', width: 640, height: 480 }), 'photo_640x480.png');
+  assert.equal(f({ pattern: '{nope} {name}' }), '{nope} photo.png', 'unknown tokens stay as typed');
+  assert.equal(f({ pattern: 'a/b:c {name}' }), 'a_b_c photo.png', 'no path separators from the pattern');
+  assert.equal(f({ pattern: '...' }), 'photo.png', 'empty after cleaning falls back to the name');
+  assert.equal(f({ subfolder: 'Saveform' }), 'Saveform/photo.png');
+  assert.equal(f({ subfolder: '/../Pics\\2026//x:y/ ' }), 'Pics/2026/x_y/photo.png');
+  assert.equal(f({ subfolder: '../..' }), 'photo.png');
+  assert.equal(buildFilename({ src: 'data:image/png;base64,AA', pageUrl: 'about:blank', ext: 'jpg', pattern: '{site}{name}' }), 'image.jpg');
 });

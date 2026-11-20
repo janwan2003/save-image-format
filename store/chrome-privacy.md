@@ -37,7 +37,7 @@ Fill them once; after that, updates and publishing go through the API.
 - **downloads:** Saves the converted image file to the user's downloads folder (optionally with the Save As dialog).
 - **activeTab:** After the user clicks a Saveform menu entry, reads the right-clicked image from the current site so it can be converted. No access to any page otherwise.
 - **scripting:** Runs a short script in the current tab only after a menu click: to read images that exist only inside the page (blob: URLs or images that need the page's cookies), to copy the converted PNG to the clipboard, and to show a brief "Saved" or error notice.
-- **storage:** Stores the user's settings (JPG/WebP/PDF quality, PDF page size, background colour, whether to show the Save dialog).
+- **storage:** Stores the user's settings (JPG/WebP/PDF quality, PDF page size, background colour, whether to show the Save dialog, file name pattern, Downloads subfolder).
 - **offscreen:** Renders SVG images to a canvas in an offscreen document, because the extension service worker cannot decode SVG.
 - **Host permission (optional, `<all_urls>`):** Never granted at install. Requested for one site at a time, only when an image server refuses to let the extension read the image, and only after the user clicks "Allow" on Saveform's prompt. The user can revoke it in Saveform's settings.
 

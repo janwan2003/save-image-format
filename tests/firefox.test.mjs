@@ -128,11 +128,9 @@ async function click(menuItemId, srcUrl) {
 
 async function savedFile(name) {
   for (let i = 0; i < 100; i++) {
-    const files = (await readdir(downloads)).filter((f) => f === name);
-    if (files.length) {
-      const buf = await readFile(path.join(downloads, name));
-      if (buf.length) return buf;
-    }
+    // name may contain a subfolder ("Saveform/web/x.png").
+    const buf = await readFile(path.join(downloads, ...name.split('/'))).catch(() => null);
+    if (buf?.length) return buf;
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error(`${name} not downloaded; have: ${(await readdir(downloads)).join(', ')}`);
@@ -155,6 +153,18 @@ test('Firefox: same-site WebP -> PNG', { skip }, async () => {
   const res = await click('save:png', `http://127.0.0.1:${pagePort}/same.webp`);
   assert.equal(res.ok, true, JSON.stringify(res));
   assert.equal(magic(await savedFile('same.png')), 'png');
+});
+
+test('Firefox: file name pattern and Downloads subfolder land on disk', { skip }, async () => {
+  await run(`await browser.storage.sync.set({ namePattern: '{width}x{height} {name}', subfolder: 'Saveform/web' }); return true;`);
+  try {
+    const res = await click('save:png', `http://127.0.0.1:${pagePort}/same.webp`);
+    assert.equal(res.ok, true, JSON.stringify(res));
+    assert.equal(res.filename, 'Saveform/web/64x48 same.png');
+    assert.equal(magic(await savedFile('Saveform/web/64x48 same.png')), 'png');
+  } finally {
+    await run(`await browser.storage.sync.remove(['namePattern', 'subfolder']); return true;`);
+  }
 });
 
 test('Firefox: CORS CDN WebP -> JPG', { skip }, async () => {

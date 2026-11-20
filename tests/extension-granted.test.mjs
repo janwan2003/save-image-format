@@ -89,6 +89,13 @@ test('settings page loads, saves a change, and lists granted sites', async () =>
   await opts.check('#askWhere');
   await opts.waitForFunction(() => document.getElementById('status').textContent === 'Saved');
   assert.equal(await sw.evaluate(async () => (await chrome.storage.sync.get('askWhere')).askWhere), true);
+  assert.equal(await opts.inputValue('#namePattern'), '{name}');
+  await opts.fill('#namePattern', '{site} {name}');
+  await opts.fill('#subfolder', 'Saveform');
+  await opts.press('#subfolder', 'Tab');
+  await opts.waitForFunction(() => document.getElementById('status').textContent === 'Saved');
+  assert.deepEqual(await sw.evaluate(() => chrome.storage.sync.get(['namePattern', 'subfolder'])),
+    { namePattern: '{site} {name}', subfolder: 'Saveform' });
   const avif = await sw.evaluate(() => globalThis.saveform.canEncode('image/avif'));
   assert.equal(await opts.isVisible('#avifRow'), avif, 'AVIF setting only shown when AVIF can be written');
   if (process.env.SHOTS) await opts.screenshot({ path: path.join(process.env.SHOTS, 'options.png'), fullPage: true });

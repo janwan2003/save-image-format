@@ -95,11 +95,11 @@ after(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });
 });
 
-async function click(menuItemId, srcUrl) {
-  return sw.evaluate(async ({ menuItemId, srcUrl }) => {
+async function click(menuItemId, srcUrl, pageUrl) {
+  return sw.evaluate(async ({ menuItemId, srcUrl, pageUrl }) => {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    return globalThis.saveform.handleClick({ menuItemId, srcUrl, frameId: 0 }, { id: tab.id });
-  }, { menuItemId, srcUrl });
+    return globalThis.saveform.handleClick({ menuItemId, srcUrl, pageUrl, frameId: 0 }, { id: tab.id });
+  }, { menuItemId, srcUrl, pageUrl });
 }
 
 async function downloaded(id) {
@@ -162,6 +162,19 @@ test('same-site WebP -> PNG keeps transparency and size', async () => {
   assert.deepEqual([info.w, info.h], [64, 48]);
   assert.equal(info.left[3], 0, 'left half stays transparent');
   assert.equal(info.right[3], 255);
+});
+
+test('file name pattern and Downloads subfolder from settings', async () => {
+  await sw.evaluate(() => chrome.storage.sync.set({ namePattern: '{site} {width}x{height} {name}', subfolder: 'Saveform/../web' }));
+  try {
+    const res = await click('save:png', `http://localhost:${cdnPort}/cors/photo.webp`, `http://127.0.0.1:${pagePort}/page.html`);
+    assert.equal(res.ok, true, JSON.stringify(res));
+    assert.equal(res.filename, 'Saveform/web/127.0.0.1 64x48 photo.png');
+    // Playwright stores downloads under GUID names, so the on-disk path is checked in the Firefox test.
+    assert.equal(magic(await fileOf(res)), 'png');
+  } finally {
+    await sw.evaluate(() => chrome.storage.sync.remove(['namePattern', 'subfolder']));
+  }
 });
 
 test('cross-site WebP from a CORS-enabled CDN -> JPG with white background', async () => {
