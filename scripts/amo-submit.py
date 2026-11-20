@@ -5,6 +5,7 @@ First run creates the listed add-on with its listing text; later runs add a new 
 Credentials: AMO_JWT_ISSUER / AMO_JWT_SECRET from the studio .env (never printed).
 Usage: python3 scripts/amo-submit.py            # upload + create or add version
        python3 scripts/amo-submit.py --status   # show the add-on's review status
+       python3 scripts/amo-submit.py --listing  # only update the listing summary/description
 """
 import base64, hashlib, hmac, json, sys, time, urllib.error, urllib.request, uuid
 from pathlib import Path
@@ -106,7 +107,7 @@ def main():
         code, res = call("POST", f"/addons/addon/{ADDON_ID}/versions/", {"upload": up["uuid"], "license": "MIT"})
         print("version", code, json.dumps({k: res.get(k) for k in ("id", "version")} if code < 300 else res)[:400])
         if code < 300:  # keep the listing text in step with the version
-            code, res = call("PATCH", f"/addons/addon/{ADDON_ID}/", {"summary": {"en-US": SUMMARY}, "description": {"en-US": DESCRIPTION}})
+            code, res = patch_listing()
     else:
         code, res = call("POST", "/addons/addon/", {
             "categories": ["photos-music-videos", "download-management"],
@@ -116,10 +117,18 @@ def main():
             "support_url": {"en-US": "https://github.com/janwan2003/save-image-format/issues"},
             "version": {"upload": up["uuid"], "license": "MIT"},
         })
-    print("create", code, json.dumps({k: res.get(k) for k in ("id", "slug", "status", "url")} if code < 300 else res)[:800])
+    print("listing/create", code, json.dumps({k: res.get(k) for k in ("id", "slug", "status", "url")} if code < 300 else res)[:800])
     if code >= 300:
         sys.exit(1)
 
 
+def patch_listing():
+    return call("PATCH", f"/addons/addon/{ADDON_ID}/", {"summary": {"en-US": SUMMARY}, "description": {"en-US": DESCRIPTION}})
+
+
 if __name__ == "__main__":
+    if "--listing" in sys.argv:
+        code, res = patch_listing()
+        print("listing", code, json.dumps(res)[:300] if code >= 300 else "updated")
+        sys.exit(code >= 300)
     main()
