@@ -41,6 +41,23 @@ export async function encodePng8(rgba, width, height, { maxColors = 256, dither 
   return writePng(width, height, palette, indices);
 }
 
+/**
+ * Palette only, for the vector tracer (lib/trace.js): up to maxColors straight-RGBA entries
+ * (Uint8Array, 4 bytes each) for `n` pixels of opaque RGBA. Exact colours when there are few
+ * enough, otherwise the same median cut + k-means as encodePng8, without mapping or dithering.
+ */
+export function choosePalette(rgba, n, maxColors) {
+  const limit = Math.max(1, Math.min(256, Math.round(maxColors)));
+  const exact = exactColors(rgba, n, limit);
+  if (exact) return exact.palette;
+  if (limit === 1) {
+    const sum = [0, 0, 0];
+    for (let p = 0; p < n * 4; p += 4) for (let c = 0; c < 3; c++) sum[c] += rgba[p + c];
+    return Uint8Array.from([...sum.map((v) => Math.round(v / n)), 255]);
+  }
+  return quantize(rgba, n, 1, limit, false).palette;
+}
+
 /** Distinct RGBA values (alpha-0 pixels merged), if at most `limit`. { palette, indices } or null. */
 function exactColors(rgba, n, limit) {
   const seen = new Map();

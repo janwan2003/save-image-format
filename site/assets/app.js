@@ -64,6 +64,9 @@ function init(root) {
   const targetCtl = $('#target-control');
   const pngColors = $('#png-colors');
   const pngColorsCtl = $('#png-colors-control');
+  const traceColors = $('#trace-colors');
+  const traceDetail = $('#trace-detail');
+  const traceCtls = [$('#trace-control'), $('#trace-detail-control')].filter(Boolean);
   const pdfDpi = $('#pdf-dpi');
   const pdfDpiCtl = $('#pdf-dpi-control');
   const bar = $('#results-bar');
@@ -95,6 +98,8 @@ function init(root) {
     targetBytes: targetOn?.checked && TARGET_FORMATS.has(formatSel.value) ? clampInt(targetKb.value, 1, 1e5, 100) * 1024 : 0,
     pngColors: pngColors ? Number(pngColors.value) || 0 : 0,
     pdfDpi: pdfDpi ? clampInt(pdfDpi.value, 36, 600, 150) : 150,
+    traceColors: traceColors ? (traceColors.value === 'bw' ? 'bw' : Number(traceColors.value) || 8) : 8,
+    traceDetail: traceDetail?.value || 'normal',
   });
 
   function syncControls() {
@@ -121,6 +126,7 @@ function init(root) {
     if (ditherCtl) ditherCtl.hidden = fmt.id !== 'gif' && !palette;
     downloadPdf.hidden = fmt.id !== 'pdf';
     if (tiffCtl) tiffCtl.hidden = fmt.id !== 'tiff';
+    for (const c of traceCtls) c.hidden = fmt.id !== 'svg';
     if (downloadTiff) downloadTiff.hidden = fmt.id !== 'tiff';
     root.dataset.format = fmt.id;
     showQuality();
@@ -177,6 +183,8 @@ function init(root) {
   for (const input of [resizeW, resizeH, resizePct, targetKb]) input?.addEventListener('input', () => settingsChanged(500));
   targetOn?.addEventListener('change', () => settingsChanged());
   pngColors?.addEventListener('change', () => settingsChanged());
+  traceColors?.addEventListener('change', () => settingsChanged());
+  traceDetail?.addEventListener('change', () => settingsChanged());
   pdfDpi?.addEventListener('change', () => {
     items.filter((i) => i.pdf).forEach(enqueue); // only PDF pages depend on it
   });
@@ -374,6 +382,10 @@ function init(root) {
       const extra = [];
       if (r.quality != null && r.targetBytes && !r.keptOriginal) extra.push(` · quality ${Math.round(r.quality * 100)}%`);
       if (r.colors && !r.keptOriginal) extra.push(` · ${r.colors} colours`);
+      if (r.traced) {
+        extra.push(` · ${r.traced.colors === 1 ? '1 colour' : `${r.traced.colors} colours`}, ${r.traced.paths === 1 ? '1 shape' : `${r.traced.paths.toLocaleString('en-US')} shapes`}`);
+        if (r.traced.width < r.width) extra.push(` · traced at ${r.traced.width} × ${r.traced.height} px`);
+      }
       if (r.approximate) extra.push(' · ', Object.assign(el('span', 'warn'), { textContent: 'rebuilt from the layers (saved without Maximize Compatibility): effects and blend modes may be missing' }));
       if (r.sourceKind === 'raw') extra.push(' · ', Object.assign(el('span', 'raw-note'), { textContent: `from the camera’s built-in ${r.sourceWidth} × ${r.sourceHeight} JPEG`, title: 'RAW files carry a JPEG made by the camera; this page converts that picture and does not develop the sensor data.' }));
       if (r.targetBytes && r.targetMet === false) {

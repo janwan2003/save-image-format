@@ -5,6 +5,7 @@ import { makePdf, pageFromCanvas } from './pdf.js';
 import { encodeGif } from './gif.js';
 import { makeTiff, tiffPage } from './tiff-write.js';
 import { encodePng8 } from './png-quant.js';
+import { traceImage, TRACE_MAX_SIDE, TRACE_MIN_SIDE, TRACE_MAX_UPSCALE } from './trace.js';
 
 export const FORMATS = {
   png: { id: 'png', mime: 'image/png', ext: 'png', label: 'PNG', lossy: false, opaque: false },
@@ -19,6 +20,8 @@ export const FORMATS = {
   gif: { id: 'gif', mime: 'image/gif', ext: 'gif', label: 'GIF', lossy: false, opaque: false, ownEncoder: true },
   // Lossless, written by lib/tiff-write.js (LZW or uncompressed; 1-bit, grey, RGB or RGBA as the pixels need).
   tiff: { id: 'tiff', mime: 'image/tiff', ext: 'tif', label: 'TIFF', lossy: false, opaque: false, ownEncoder: true },
+  // Vector paths traced from the pixels by lib/trace.js (site only; not in the extension menu).
+  svg: { id: 'svg', mime: 'image/svg+xml', ext: 'svg', label: 'SVG', lossy: false, opaque: false, ownEncoder: true },
 };
 
 /** Icon sizes written into an ICO file (each as an embedded PNG). */
@@ -192,6 +195,17 @@ export async function convertBlob(input, formatId, options = {}) {
       const page = tiffPage(data, out.width, out.height, { compression: options.tiffCompression });
       const preview = options.preview ? await previewOf(canvas) : undefined;
       return { ...base, blob: makeTiff([page]), tiffPage: page, preview };
+    }
+    if (formatId === 'svg') {
+      // Traced with the longer side between TRACE_MIN_SIDE and TRACE_MAX_SIDE px (small images at
+      // most TRACE_MAX_UPSCALE times larger); the SVG still declares the output size.
+      const side = Math.max(out.width, out.height);
+      const f = side > TRACE_MAX_SIDE ? TRACE_MAX_SIDE / side : side < TRACE_MIN_SIDE ? Math.min(TRACE_MAX_UPSCALE, TRACE_MIN_SIDE / side) : 1;
+      const tw = Math.max(1, Math.round(out.width * f)), th = Math.max(1, Math.round(out.height * f));
+      const [, tctx] = f !== 1 ? render(tw, th) : [canvas, ctx];
+      const { data } = tctx.getImageData(0, 0, tw, th);
+      const t = traceImage(data, tw, th, { colors: options.traceColors ?? 8, detail: options.traceDetail || 'normal', outWidth: out.width, outHeight: out.height });
+      return { ...base, blob: new Blob([t.svg], { type: fmt.mime }), traced: { colors: t.colors, paths: t.paths, width: tw, height: th } };
     }
     if (formatId === 'gif') {
       const { data } = ctx.getImageData(0, 0, out.width, out.height);

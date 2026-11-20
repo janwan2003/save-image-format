@@ -60,7 +60,7 @@ const ICON_UPLOAD = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" str
 const ICON_LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
 function toolHtml(page) {
-  const opts = Object.entries({ ...(page.sameFormat ? { same: 'Same as original' } : {}), png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)', gif: 'GIF', tiff: 'TIFF' })
+  const opts = Object.entries({ ...(page.sameFormat ? { same: 'Same as original' } : {}), png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)', gif: 'GIF', tiff: 'TIFF', svg: 'SVG (traced vector)' })
     .map(([id, label]) => `<option value="${id}"${id === page.to ? ' selected' : ''}>${label}</option>`).join('');
   // Resize, target file size and PNG colours: on every page; a page's `resize`, `targetKb` and
   // `pngColors` fields only set the starting values.
@@ -88,6 +88,15 @@ function toolHtml(page) {
     .map(([n, label]) => `<option value="${n}"${n === (page.pdfDpi || 150) ? ' selected' : ''}>${label}</option>`).join('');
   const pdfDpi = `
       <label class="control" id="pdf-dpi-control" for="pdf-dpi"${page.from === 'pdf' ? '' : ' hidden'}><span>PDF resolution</span><select id="pdf-dpi">${dpis}</select></label>`;
+  // Vector tracing (SVG output): number of colours and how closely edges are followed.
+  const tc = page.traceColors ?? 8;
+  const traceColors = [['bw', 'Black and white'], [2, '2'], [4, '4'], [8, '8'], [16, '16'], [32, '32']]
+    .map(([n, label]) => `<option value="${n}"${String(n) === String(tc) ? ' selected' : ''}>${label}</option>`).join('');
+  const traceDetail = [['high', 'High (follows every edge)'], ['normal', 'Normal'], ['low', 'Low (smoother, fewer shapes)']]
+    .map(([id, label]) => `<option value="${id}"${id === (page.traceDetail || 'normal') ? ' selected' : ''}>${label}</option>`).join('');
+  const trace = `
+      <label class="control" id="trace-control" for="trace-colors"><span>Colours</span><select id="trace-colors">${traceColors}</select></label>
+      <label class="control" id="trace-detail-control" for="trace-detail"><span>Detail</span><select id="trace-detail">${traceDetail}</select></label>`;
   const svg = page.svgOption ? `
       <label class="control" for="svg-size"><span>SVG size</span><input type="number" id="svg-size" min="16" max="8192" step="1" value="1024"> px</label>` : '';
   return `<div class="tool" data-tool${page.slug === '' ? ' data-general' : ''}${page.from === 'pdf' ? ' data-pdf-input' : ''}>
@@ -103,7 +112,7 @@ function toolHtml(page) {
       <label class="control" id="bg-control" for="bg"><span>Background</span><input type="color" id="bg" value="#ffffff"></label>
       <label class="control" id="page-size-control" for="page-size"><span>Page size</span><select id="page-size">${pageSizes}</select></label>
       <label class="control" id="tiff-control" for="tiff-compression"><span>Compression</span><select id="tiff-compression"><option value="lzw" selected>LZW (smaller)</option><option value="none">None (uncompressed)</option></select></label>
-      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${pdfDpi}${keepJpeg}${resize}${dither}${svg}
+      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${pdfDpi}${keepJpeg}${resize}${dither}${trace}${svg}
     </div>
     <p class="note" id="format-note" role="status" hidden></p>
     <p class="local-note">${ICON_LOCK}Converted on your device. Nothing is uploaded.</p>
@@ -128,6 +137,7 @@ function stepsHtml(page) {
     pdf: 'Pick a page size (A4, US Letter, or the size of the image) and the quality; 100% stores the pixels losslessly. Use the arrows to put the pages in order.',
     ico: 'Tick the icon sizes to include. 16, 32 and 48 px cover browser tabs and Windows; 256 px is for high-resolution displays.',
     tiff: 'TIFF is lossless. LZW compression makes smaller files that image editors, print shops and scanning software read; choose None only for very old software. Use the arrows to set the page order for a multi-page TIFF.',
+    svg: 'Pick how many colours the drawing should have (Black and white makes one solid shape, for cutting machines and stencils) and the detail. Logos and icons work best with 2 to 8 colours.',
     gif: 'Leave Dither ticked for photos and gradients. Untick it for flat graphics, screenshots and pixel art: edges stay clean and the file gets smaller.',
   }[page.to];
   const lastStep = page.to === 'pdf'
@@ -442,6 +452,7 @@ async function main() {
     copyFile(join(ROOT, 'extension/lib/gif.js'), join(DIST, 'lib/gif.js')),
     copyFile(join(ROOT, 'extension/lib/tiff-write.js'), join(DIST, 'lib/tiff-write.js')),
     copyFile(join(ROOT, 'extension/lib/png-quant.js'), join(DIST, 'lib/png-quant.js')),
+    copyFile(join(ROOT, 'extension/lib/trace.js'), join(DIST, 'lib/trace.js')),
   ]);
   // HEIC decoder (LGPL, vendored unmodified; see site/vendor/libheif/README.md).
   await mkdir(join(DIST, 'vendor/libheif'), { recursive: true });
