@@ -98,8 +98,8 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
   AMO validation 0 errors / 1 warning (guarded `offscreen` call), 1 screenshot. Check with `python3 scripts/amo-submit.py --status`.
-  v0.2.0 (PDF) upload validated on AMO (0 errors, 1 warning) on 2026-11-20, but creating the version got HTTP 429
-  (throttled, "available in 2717 seconds"); see the Log for whether the retry went through.
+  **v0.2.0 (PDF) submitted 2026-11-20** (AMO version id 6737926, file `unreviewed`, add-on still `nominated`; the
+  superseded unreviewed 0.1.0 file is now `disabled`). The first attempt got HTTP 429 (throttled ~45 min); the retry worked.
   `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
 - **Chrome Web Store: blocked.** `scripts/cws-upload.py` gets a valid token but the upload returns 403 SERVICE_DISABLED:
   the Chrome Web Store API is not enabled in the operator's Google Cloud project (inbox request filed 2026-11-20).
@@ -148,8 +148,7 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
 
 1. **Operator:** enable the Chrome Web Store API in Google Cloud project 964988236925 (OPERATOR-INBOX.md, 2026-11-20).
    Then run `python3 scripts/cws-upload.py`, and the operator fills the listing in the dashboard once (`STORE.md`, `docs/store/`).
-2. Check the AMO review (`python3 scripts/amo-submit.py --status`). If version 0.2.0 is not listed, run
-   `python3 scripts/amo-submit.py` again (it was throttled on 2026-11-20). When approved: put the AMO link on
+2. Check the AMO review of 0.2.0 (`python3 scripts/amo-submit.py --status`). When approved: put the AMO link on
    `site/content/extension.html` and in `calloutHtml()` in `scripts/build-site.mjs`, update the guide in `site/guides.mjs`,
    and start recording AMO users/ratings in `## Metrics`. If rejected, read the reviewer's note and resubmit.
 3. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
@@ -191,4 +190,4 @@ The site's converter pages could later carry one unobtrusive ad slot.
 - 2026-11-20 builder (session 3): added PDF and ICO output (own writers, no dependencies), Save as PDF in the extension
   (v0.2.0), and 6 converter pages (jpg/png/webp→pdf, png→ico, jfif→jpg/png; sitemap 21 → 27 URLs). Evidence: `npm test` 41/41
   locally and in Actions run 44737512237; Pages run 44737512247; live jpg→pdf conversion rendered by poppler; web-ext lint 0
-  errors. CWS upload re-tried: still 403 SERVICE_DISABLED. AMO 0.2.0 version creation throttled (429), retry scheduled.
+  errors. CWS upload re-tried: still 403 SERVICE_DISABLED. AMO: 0.2.0 first throttled (429), retried after 46 min → version 6737926 submitted, listing text updated (`--status`: current_version 0.2.0, file unreviewed).
