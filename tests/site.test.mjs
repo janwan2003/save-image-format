@@ -871,6 +871,15 @@ test('heic-to-pdf combines two HEIC photos into one 2-page PDF; a broken HEIC sh
   await page.close();
 });
 
+test('the HEIC guide embeds a HEIC to JPG converter that decodes a HEIC file', async () => {
+  const { page } = await openPage('/how-to-open-heic-files-on-windows/');
+  assert.equal(await page.locator('#format').inputValue(), 'jpg');
+  await page.setInputFiles('#file', HEIC_GRID);
+  await waitForDone(page, 1);
+  assert.match(await page.locator('#results .result-meta').textContent(), /HEIC .*96 × 128 px/);
+  await page.close();
+});
+
 test('the general converter also accepts HEIC', async () => {
   const { page } = await openPage('/');
   assert.match(await page.locator('#file').getAttribute('accept'), /\.heic/);

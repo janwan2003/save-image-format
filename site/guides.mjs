@@ -128,4 +128,54 @@ export const guides = [
 <p>We built Saveform with these checks in mind, so here is how it measures up. It adds <em>Save as PNG / JPG / WebP / PDF</em> (and AVIF where the browser can create it) plus <em>Copy as PNG</em> to the right-click menu. Conversion happens on your device with the same code as this site’s converters; the only thing it downloads is the image you clicked, nothing is sent to any server of ours, there are no analytics and no account. The only install warning is “Manage your downloads”: it does not ask for access to the sites you visit, and requests access to a single image host only if that server blocks the download, which you can decline or revoke. The source code is public on <a href="https://github.com/janwan2003/save-image-format" rel="noopener">GitHub</a> under the MIT licence.</p>
 <p>It is new and does not have the history the old extension had, and its store listings are not live yet (the Firefox version is in Mozilla’s review queue, the Chrome version comes next). You can install it from source today; see <a href="${root}extension/">the extension page</a> for the steps and a plain-language explanation of every permission. Other image-saving extensions exist too; whichever you choose, the checks above apply.</p>`,
   },
+  {
+    slug: 'how-to-open-heic-files-on-windows',
+    footer: 'Open HEIC photos on Windows',
+    title: 'How to Open or Convert HEIC Photos on Windows (Free Options) | Saveform',
+    description: 'Why iPhone photos arrive as .heic files that Windows will not open, how to add HEIC support to Windows, convert HEIC to JPG for free without uploading, and stop the iPhone making HEIC.',
+    h1: 'How to open or convert HEIC photos on Windows',
+    lede: 'You copied photos from an iPhone, or someone sent you some, and Windows shows .heic files it cannot open. Here are three ways to deal with them: convert them in your browser, add HEIC support to Windows, or have the iPhone send JPG in the first place.',
+    tool: { from: 'heic', to: 'jpg' },
+    toolTitle: 'Convert HEIC photos to JPG here',
+    related: ['how-to-save-webp-as-png', 'why-images-save-as-webp'],
+    converters: ['heic-to-jpg', 'heic-to-png', 'heic-to-pdf', 'image-to-pdf'],
+    body: (root) => `
+<h2>What a HEIC file is</h2>
+<p>HEIC is the format iPhones and iPads use for photos unless you change the camera setting. The file is a HEIF container (High Efficiency Image File Format) with the picture compressed by HEVC, the same codec as H.265 video. That keeps photos at roughly the quality of a JPG in less space, which is why Apple made it the default.</p>
+<p>Apple devices open HEIC everywhere. Most other software does not: Chrome, Edge and Firefox cannot display it, many upload forms refuse it, and Windows needs extra components before Photos or File Explorer thumbnails can show it.</p>
+
+<h2>Option 1: convert the photos to JPG in your browser</h2>
+<p>The quickest way, and the one that needs nothing installed:</p>
+<ol class="steps-list">
+  <li>Drop the .heic files on the box above, or click it to choose them. You can add many at once.</li>
+  <li>Leave the quality at 90% unless you need smaller files.</li>
+  <li>Click <strong>Download</strong> on a photo, or <strong>Download all (ZIP)</strong> for the whole batch.</li>
+</ol>
+<p>The photos are decoded on your computer, not on a server. The first HEIC file makes the page download a decoder (libheif, compiled to WebAssembly) from this site; after that, the conversion runs entirely inside the browser tab, so private photos never leave your device. The JPG keeps the picture and its orientation, but not the GPS location or camera details. If you need a PNG for editing, or one PDF with several photos, use <a href="${root}heic-to-png/">HEIC to PNG</a> or <a href="${root}heic-to-pdf/">HEIC to PDF</a>.</p>
+
+<h2>Option 2: let Windows open HEIC itself</h2>
+<p>Microsoft offers HEIC support as two add-ons in the Microsoft Store, and its own support pages say you need both:</p>
+<ul>
+  <li><strong>HEIF Image Extensions</strong> handles the HEIF container. It is free.</li>
+  <li><strong>HEVC Video Extensions</strong> decodes the compressed picture inside. Microsoft charges a small fee for it in the Store, although some PCs come with a manufacturer version already installed.</li>
+</ul>
+<p>Once both are installed, the Photos app opens .heic files and File Explorer can show thumbnails. On Windows 11, check under <em>Settings → Apps → Installed apps</em> whether “HEVC Video Extensions” is already there before buying it. This route is best if you receive HEIC photos regularly and only need to view them; for sending or uploading, you still need JPG.</p>
+
+<h2>Option 3: stop the iPhone from making HEIC files</h2>
+<p>Two settings on the iPhone decide what you get:</p>
+<ul>
+  <li><strong>Settings → Camera → Formats → Most Compatible</strong> makes the camera save new photos as JPG (and videos as H.264). Photos take more storage this way. Existing photos stay HEIC.</li>
+  <li><strong>Settings → Photos → Transfer to Mac or PC → Automatic</strong> asks the iPhone to convert photos to a compatible format when you copy them to a computer over a cable. <em>Keep Originals</em> copies the HEIC files unchanged.</li>
+</ul>
+<p>Sharing apps and email often convert as well, but not always, so a converter is still handy for photos that arrive as HEIC anyway.</p>
+
+<h2>Which option should you use?</h2>
+<ul>
+  <li>A few photos to upload, print or email: convert them above, it takes seconds.</li>
+  <li>You view iPhone photos on Windows every week: install the two Store extensions.</li>
+  <li>It is your own iPhone and storage is not tight: switch the camera to Most Compatible and the problem goes away for new photos.</li>
+</ul>
+<p>The same page also handles other formats Windows and websites stumble over, such as <a href="${root}webp-to-jpg/">WebP</a> and <a href="${root}avif-to-jpg/">AVIF</a>. If those come from saving pictures on websites, <a href="${root}how-to-save-webp-as-png/">our WebP guide</a> explains why.</p>
+`,
+  },
 ];
