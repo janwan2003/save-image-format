@@ -839,6 +839,33 @@ test('heic-to-jpg decodes an HEIC photo with the WebAssembly decoder and writes 
   await page.close();
 });
 
+test('a Display P3 HEIC (as iPhones write) is converted to sRGB, matching Chromium\'s own colour management', async () => {
+  // Same picture twice: untagged, and tagged with a Display P3 ICC profile (scripts/make-heic-fixtures.mjs).
+  const { page } = await openPage('/heic-to-png/');
+  await page.setInputFiles('#file', [join(ROOT, 'tests/fixtures/quadrants-p3-untagged.heic'), join(ROOT, 'tests/fixtures/quadrants-p3.heic')]);
+  await waitForDone(page, 2);
+  const points = [[16, 12], [48, 12], [16, 36], [48, 36]];
+  const raw = [], tagged = [];
+  for (const [x, y] of points) {
+    raw.push((await pixelOfResult(page, 0, x, y)).slice(0, 3));
+    tagged.push((await pixelOfResult(page, 1, x, y)).slice(0, 3));
+  }
+  // Reference: Chromium converting the same numbers, read as Display P3, to its sRGB canvas.
+  const expected = await page.evaluate((raw) => raw.map(([r, g, b]) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 1;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = `color(display-p3 ${r / 255} ${g / 255} ${b / 255})`;
+    ctx.fillRect(0, 0, 1, 1);
+    return [...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  }), raw);
+  expected.forEach((want, i) => {
+    assert.ok(want.some((v, k) => Math.abs(v - raw[i][k]) >= 8), `quadrant ${i}: test colour must differ between P3 and sRGB`);
+    assert.ok(want.every((v, k) => Math.abs(v - tagged[i][k]) <= 2), `quadrant ${i}: got ${tagged[i]}, Chromium says ${want} (untagged ${raw[i]})`);
+  });
+  await page.close();
+});
+
 test('heic-to-png applies the tile grid and the stored rotation (iPhone-style HEIC)', async () => {
   const { page } = await openPage('/heic-to-png/');
   await page.setInputFiles('#file', HEIC_GRID);
@@ -849,6 +876,22 @@ test('heic-to-png applies the tile grid and the stored rotation (iPhone-style HE
   assert.deepEqual([bytes.readUInt32BE(16), bytes.readUInt32BE(20)], [96, 128], 'rotated to portrait');
   const colours = await quadrantColours(page, 96, 128);
   [[0, 255, 0], [255, 255, 0], [255, 0, 0], [0, 0, 255]].forEach((rgb, i) => assert.ok(near(colours[i], rgb), `quadrant ${i}: ${colours[i]} ≈ ${rgb}`));
+  await page.close();
+});
+
+test('WebP output wider than 16,383 px is refused with a clear message instead of being cropped', async () => {
+  const { page } = await openPage('/png-to-webp/');
+  const wide = await makeFixture(page, 'image/png', 16384, 4);
+  await page.setInputFiles('#file', { name: 'panorama.png', mimeType: 'image/png', buffer: wide });
+  await page.waitForSelector('#results li[data-state="error"]', { timeout: 15000 });
+  const text = await page.locator('#results li[data-state="error"]').textContent();
+  assert.match(text, /at most 16,383 pixels/);
+  assert.match(text, /16384 × 4/);
+  // 16,383 px is still allowed.
+  await page.setInputFiles('#file', { name: 'edge.png', mimeType: 'image/png', buffer: await makeFixture(page, 'image/png', 16383, 4) });
+  await waitForDone(page, 1);
+  const { bytes } = await downloadBytes(page, '#results li[data-state="done"] a.btn');
+  assert.equal(bytes.toString('latin1', 8, 12), 'WEBP');
   await page.close();
 });
 

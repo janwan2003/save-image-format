@@ -124,12 +124,19 @@ export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null } =
  * dither (GIF, default true: Floyd–Steinberg when the image has more than 256 colours).
  * Returns { blob, width, height, sourceKind } and, for PDF, pdfPage (to combine pages later).
  */
+const WEBP_MAX = 16383;
+
 export async function convertBlob(input, formatId, options = {}) {
   const fmt = FORMATS[formatId];
   if (!fmt) throw new Error(`Unknown format ${formatId}`);
   const quality = fmt.lossy ? clamp(options.quality ?? (formatId === 'jpg' || formatId === 'pdf' ? 0.92 : 0.9), 0.01, 1) : undefined;
   const img = await decode(input, options);
   try {
+    // The WebP format stores width and height in 14 bits; Chromium crops larger canvases silently.
+    if (formatId === 'webp' && Math.max(img.width, img.height) > WEBP_MAX) {
+      const e = new Error(`WebP images can be at most ${WEBP_MAX.toLocaleString('en-US')} pixels wide or tall, and this one is ${img.width} × ${img.height}. Choose PNG or JPG instead.`);
+      e.code = 'too-large'; throw e;
+    }
     const canvas = makeCanvas(img.width, img.height);
     const ctx = canvas.getContext('2d');
     if (fmt.opaque) {

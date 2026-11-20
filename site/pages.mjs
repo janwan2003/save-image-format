@@ -163,8 +163,8 @@ export const converters = [
     ],
     faq: [
       { q: 'Are my photos uploaded?', a: 'No. The page decodes each HEIC file with a WebAssembly decoder running in your browser and encodes the JPG there too. The decoder is loaded from this site once; after that, conversion works even offline.' },
-      { q: 'What quality should I pick?', a: 'The default of 90% keeps photos visually identical for almost everyone. Use 95% or more if you plan to edit the photos; go down to 80% if file size matters most.' },
       { q: 'Is the location of my photo kept?', a: 'No. Only the pixels are converted, so GPS position, camera model and other metadata in the HEIC file are left out of the JPG. Keep the original if you need that information.' },
+      { q: 'Will the colours look right?', a: 'Yes. iPhones save photos in the wider Display P3 colour space. The converter translates them to standard sRGB, the colour space every program assumes for files without a profile, so they do not look washed out elsewhere. The rare colours that sRGB cannot show are set to the nearest one it can.' },
       { q: 'Will sideways photos come out rotated correctly?', a: 'Yes. The rotation stored in the HEIC file is applied while decoding, so the JPG shows the photo the way your iPhone does.' },
       { q: 'What about Live Photos, bursts and portrait photos?', a: 'You get the main still image. The video part of a Live Photo is a separate file and depth maps are not converted.' },
     ],
@@ -187,6 +187,7 @@ export const converters = [
       { q: 'Is the PNG better quality than the HEIC?', a: 'It is identical to the decoded HEIC. PNG adds no further loss, but it cannot restore detail the HEIC compression already removed.' },
       { q: 'Why is the PNG so much bigger?', a: 'HEIC compresses photos very efficiently while PNG is lossless. For photos you only want to share, JPG is usually the better choice.' },
       { q: 'Are my images uploaded?', a: 'No. The decoder runs in your browser tab and the PNG is created there. Nothing is sent to a server.' },
+      { q: 'Will the colours look right?', a: 'Yes. iPhones save photos in the wider Display P3 colour space. The converter translates them to standard sRGB, the colour space every program assumes for files without a profile, so they do not look washed out elsewhere. The rare colours that sRGB cannot show are set to the nearest one it can.' },
       { q: 'Does it work on Windows and Chromebooks?', a: 'Yes. It works in current versions of Chrome, Edge, Firefox and Safari on any system, without installing codecs.' },
     ],
   },

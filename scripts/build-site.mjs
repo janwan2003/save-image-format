@@ -337,6 +337,7 @@ async function main() {
     copyFile(join(SITE, 'assets/app.js'), join(DIST, 'assets/app.js')),
     copyFile(join(SITE, 'assets/heic.js'), join(DIST, 'assets/heic.js')),
     copyFile(join(SITE, 'assets/heic-worker.js'), join(DIST, 'assets/heic-worker.js')),
+    copyFile(join(SITE, 'assets/icc.js'), join(DIST, 'assets/icc.js')),
     copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
     copyFile(join(SITE, 'og-image.png'), join(DIST, 'og-image.png')),

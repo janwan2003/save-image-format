@@ -391,7 +391,7 @@ function kindLabel(kind, file) {
 }
 
 function friendlyError(err, file) {
-  if (err?.kind === 'heic' || /\.hei[cf]$/i.test(file.name)) {
+  if (err?.code !== 'too-large' && (err?.kind === 'heic' || /\.hei[cf]$/i.test(file.name))) {
     return `${err?.message || 'This HEIC file could not be converted.'} If it came from an iPhone, try exporting it again, or set Camera → Formats → Most Compatible for future photos.`;
   }
   return err?.message || 'This file could not be converted.';

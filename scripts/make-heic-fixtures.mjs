@@ -8,6 +8,9 @@
 // quadrants.heic     64×48, one coded image: red top-left, green top-right, blue bottom-left, yellow bottom-right.
 // grid-rotated.heic  a 128×96 picture stored as a 2×2 grid of 64×48 tiles (as iPhones store photos, in
 //                    512×512 tiles) with an `irot` property of 90° anticlockwise, so it displays as 96×128.
+// quadrants-p3.heic  64×48, four mid-saturation colours, tagged (colr 'prof') with a Display P3 ICC profile we
+//                    write below, like iPhone photos. quadrants-p3-untagged.heic: the same picture with no tag,
+//                    so the test can tell what the decoder does with the profile.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -118,6 +121,43 @@ function heif({ items, props, primary, refs = [] }) {
 
 const ispe = (w, h) => fullBox('ispe', 0, 0, u32(w), u32(h));
 
+/**
+ * A minimal ICC v2 display profile for Display P3: D50-adapted colorants of the P3 primaries
+ * (same numbers as any Display P3 profile, they follow from the colour space) and the sRGB tone
+ * curve as a `para` type 3 curve. Written from the ICC.1 layout; no existing profile file is copied.
+ */
+function displayP3Icc() {
+  const s15 = (v) => { const b = Buffer.alloc(4); b.writeInt32BE(Math.round(v * 65536)); return b; };
+  const xyz = (x, y, z) => Buffer.concat([Buffer.from('XYZ ', 'latin1'), u32(0), s15(x), s15(y), s15(z)]);
+  const para = Buffer.concat([Buffer.from('para', 'latin1'), u32(0), u16(3), u16(0),
+    s15(2.4), s15(1 / 1.055), s15(0.055 / 1.055), s15(1 / 12.92), s15(0.04045)]);
+  const text = Buffer.concat([Buffer.from('text', 'latin1'), u32(0), Buffer.from('Saveform test profile\0', 'latin1')]);
+  const tags = [
+    ['wtpt', xyz(0.9642, 1, 0.8249)],
+    ['rXYZ', xyz(0.515121, 0.241196, -0.001053)],
+    ['gXYZ', xyz(0.291977, 0.692245, 0.041885)],
+    ['bXYZ', xyz(0.157104, 0.066574, 0.784073)],
+    ['rTRC', para], ['gTRC', para], ['bTRC', para],
+    ['cprt', text],
+  ];
+  const pad4 = (b) => Buffer.concat([b, Buffer.alloc((4 - (b.length % 4)) % 4)]);
+  let offset = 128 + 4 + tags.length * 12;
+  const table = [], data = [];
+  for (const [sig, body] of tags) {
+    const padded = pad4(body);
+    table.push(Buffer.concat([Buffer.from(sig, 'latin1'), u32(offset), u32(body.length)]));
+    data.push(padded);
+    offset += padded.length;
+  }
+  const header = Buffer.alloc(128);
+  header.writeUInt32BE(offset, 0);
+  header.writeUInt32BE(0x02100000, 8);
+  header.write('mntrRGB XYZ ', 12, 'latin1');
+  header.write('acsp', 36, 'latin1');
+  s15(0.9642).copy(header, 68); s15(1).copy(header, 72); s15(0.8249).copy(header, 76);
+  return Buffer.concat([header, u32(tags.length), ...table, ...data]);
+}
+
 // ---- fixtures ---------------------------------------------------------------
 mkdirSync(OUT, { recursive: true });
 
@@ -147,4 +187,19 @@ mkdirSync(OUT, { recursive: true });
   });
   writeFileSync(join(OUT, 'grid-rotated.heic'), file);
   console.log(`grid-rotated.heic ${file.length} bytes`);
+}
+
+{
+  // Mid-saturation colours, where Display P3 and sRGB numbers differ clearly.
+  const nals = nalUnits(encodeQuadrants(64, 48, ['#c87830', '#30b040', '#3070c8', '#b04090']));
+  for (const [name, tagged] of [['quadrants-p3.heic', true], ['quadrants-p3-untagged.heic', false]]) {
+    const colr = box('colr', Buffer.from('prof', 'latin1'), displayP3Icc());
+    const file = heif({
+      primary: 1,
+      props: [hvcC(nals), ispe(64, 48), ...(tagged ? [colr] : [])],
+      items: [{ id: 1, type: 'hvc1', data: sampleData(nals), props: tagged ? [1, 2, 3] : [1, 2] }],
+    });
+    writeFileSync(join(OUT, name), file);
+    console.log(`${name} ${file.length} bytes`);
+  }
 }
