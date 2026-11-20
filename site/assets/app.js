@@ -5,6 +5,11 @@ import { FORMATS, canEncode, convertBlob, decode, sniffType } from '../lib/conve
 import { makePdf } from '../lib/pdf.js';
 import { baseNameFromUrl } from '../lib/filename.js';
 import { makeZip } from '../lib/zip.js';
+import { decodeHeic } from './heic.js';
+
+// Formats the browser may not decode itself. HEIC (iPhone photos) goes to a WebAssembly
+// decoder that is only downloaded when the first HEIC file is added.
+const FALLBACK_DECODERS = { heic: decodeHeic };
 
 const tool = document.querySelector('[data-tool]');
 if (tool) init(tool);
@@ -179,7 +184,7 @@ function init(root) {
       renderRow(item);
       updateBar();
       try {
-        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, opts);
+        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, { ...opts, fallbackDecoders: FALLBACK_DECODERS });
         if (item.removed) continue;
         revoke(item);
         item.result = { ...r, format: opts.format, url: URL.createObjectURL(r.blob), name: outputName(item.file.name, opts.format) };
@@ -379,7 +384,7 @@ function uniqueName(name, used) {
 
 function kindLabel(kind, file) {
   if (kind === 'jpeg' && /\.jfif$/i.test(file.name)) return 'JFIF';
-  const labels = { png: 'PNG', jpeg: 'JPG', gif: 'GIF', webp: 'WebP', avif: 'AVIF', svg: 'SVG', bmp: 'BMP', ico: 'ICO' };
+  const labels = { png: 'PNG', jpeg: 'JPG', gif: 'GIF', webp: 'WebP', avif: 'AVIF', svg: 'SVG', bmp: 'BMP', ico: 'ICO', heic: 'HEIC' };
   if (labels[kind]) return labels[kind];
   const ext = file.name.split('.').pop();
   return ext && ext !== file.name ? ext.toUpperCase() : 'Image';
@@ -387,7 +392,7 @@ function kindLabel(kind, file) {
 
 function friendlyError(err, file) {
   if (err?.kind === 'heic' || /\.hei[cf]$/i.test(file.name)) {
-    return 'HEIC/HEIF photos cannot be decoded by this browser. On an iPhone, set Camera → Formats → Most Compatible, or export the photo as JPG.';
+    return `${err?.message || 'This HEIC file could not be converted.'} If it came from an iPhone, try exporting it again, or set Camera → Formats → Most Compatible for future photos.`;
   }
   return err?.message || 'This file could not be converted.';
 }

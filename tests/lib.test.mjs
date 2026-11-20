@@ -27,6 +27,10 @@ test('sniffType recognises common formats', () => {
   assert.equal(sniffType(s('GIF89a')), 'gif');
   assert.equal(sniffType(s('RIFF\0\0\0\0WEBPVP8 ')), 'webp');
   assert.equal(sniffType(s('\0\0\0\x1cftypavif')), 'avif');
+  // HEIF family: major brand alone, or mif1 + compatible brands (an AVIF can also start with mif1).
+  assert.equal(sniffType(s('\0\0\0\x18ftypheic\0\0\0\0mif1heic')), 'heic');
+  assert.equal(sniffType(s('\0\0\0\x18ftypmif1\0\0\0\0mif1heic')), 'heic');
+  assert.equal(sniffType(s('\0\0\0\x18ftypmif1\0\0\0\0mif1avif')), 'avif');
   assert.equal(sniffType(s('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>')), 'svg');
   assert.equal(sniffType(s('hello world')), null);
 });

@@ -18,9 +18,9 @@ export const converters = [
     from: 'any',
     to: 'png',
     title: 'Image Converter: PNG, JPG, WebP, PDF, ICO – No Upload | Saveform',
-    description: 'Free image converter that runs in your browser. Turn WebP, AVIF, PNG, JPG, GIF or SVG into PNG, JPG, WebP, AVIF, GIF, PDF or ICO. No upload, no sign-up, batch ZIP download.',
+    description: 'Free image converter that runs in your browser. Turn WebP, AVIF, HEIC, PNG, JPG, GIF or SVG into PNG, JPG, WebP, AVIF, GIF, PDF or ICO. No upload, no sign-up, batch ZIP download.',
     h1: 'Convert images to PNG, JPG, WebP, PDF and more',
-    lede: 'Drop in any image your browser can open (WebP, AVIF, PNG, JPG, GIF, SVG, BMP, ICO) and save it in the format you need, or combine several into one PDF. Conversion runs on your device, so nothing is uploaded.',
+    lede: 'Drop in any image your browser can open (WebP, AVIF, PNG, JPG, GIF, SVG, BMP, ICO) or an iPhone HEIC photo and save it in the format you need, or combine several into one PDF. Conversion runs on your device, so nothing is uploaded.',
     svgOption: true,
     explainerTitle: 'Which format should I pick?',
     explainer: [
@@ -33,7 +33,7 @@ export const converters = [
     faq: [
       { q: 'Is this converter free?', a: 'Yes. There is no sign-up, no watermark and no limit on how many files you convert. Very large images are limited only by your device’s memory.' },
       { q: 'How can it convert without uploading?', a: 'Modern browsers can decode images and save them again through the canvas API. This page uses exactly that, so your pictures never leave the browser tab.' },
-      { q: 'Which input formats work?', a: 'Anything your browser can display: WebP, AVIF, PNG, JPG/JPEG, GIF (first frame), SVG, BMP and ICO. HEIC photos from iPhones generally cannot be decoded by browsers, so they are not supported here.' },
+      { q: 'Which input formats work?', a: 'Anything your browser can display: WebP, AVIF, PNG, JPG/JPEG, GIF (first frame), SVG, BMP and ICO, plus HEIC/HEIF photos from iPhones, which the page decodes itself with a WebAssembly decoder because most browsers cannot.' },
       { q: 'Is any information about my images kept?', a: 'No. There are no analytics, no cookies and no accounts. Converted images exist only in your browser until you download them or close the tab.' },
       { q: 'What is the Saveform extension?', a: 'A browser extension that adds Save as PNG, JPG, WebP or PDF to the right-click menu on any web image, using the same conversion code as this page.' },
     ],
@@ -122,6 +122,71 @@ export const converters = [
       { q: 'Which quality should I choose?', a: 'Around 90% keeps the image visually unchanged for most photos. Lower values make smaller files but can show blockiness around edges.' },
       { q: 'Will transparent areas turn black?', a: 'No. They are filled with the background colour you choose in the settings, white by default.' },
       NO_UPLOAD,
+    ],
+  },
+  {
+    slug: 'heic-to-jpg',
+    from: 'heic',
+    to: 'jpg',
+    title: 'HEIC to JPG Converter – iPhone Photos, No Upload | Saveform',
+    description: 'Convert iPhone HEIC photos to JPG in your browser. Works in Chrome, Edge and Firefox, batch converts with ZIP download, and your photos never leave your device.',
+    h1: 'HEIC to JPG converter',
+    lede: 'Turn iPhone and iPad .heic photos into JPG files that every computer, website and app accepts. The photos are decoded on your own device, so nothing is uploaded, and location data is not copied into the JPG.',
+    explainerTitle: 'Why your photos are HEIC, and why JPG helps',
+    explainer: [
+      'Since iOS 11 (2017), iPhones save photos as HEIC by default. HEIC is a High Efficiency Image File Format (HEIF) file holding pictures compressed with HEVC, the H.265 video codec, which keeps photos at roughly the quality of a JPG in noticeably less space.',
+      'The catch is support. Chrome, Edge and Firefox cannot open HEIC, Windows needs extra codecs from the Microsoft Store, and many upload forms, print services and older programs reject the files. JPG has none of these problems.',
+      'Most online HEIC converters upload your photos to a server. This one downloads a HEIC decoder (libheif, compiled to WebAssembly, about 1.5 MB) from this site the first time you add a HEIC file, and then does all the work inside your browser tab. The JPG contains only the picture: camera details and GPS location from the original are not copied.',
+      'To stop getting HEIC files at all, set <em>Settings → Camera → Formats → Most Compatible</em> on the iPhone. Photos then save as JPG, at the cost of more storage.',
+    ],
+    faq: [
+      { q: 'Are my photos uploaded?', a: 'No. The page decodes each HEIC file with a WebAssembly decoder running in your browser and encodes the JPG there too. The decoder is loaded from this site once; after that, conversion works even offline.' },
+      { q: 'What quality should I pick?', a: 'The default of 90% keeps photos visually identical for almost everyone. Use 95% or more if you plan to edit the photos; go down to 80% if file size matters most.' },
+      { q: 'Is the location of my photo kept?', a: 'No. Only the pixels are converted, so GPS position, camera model and other metadata in the HEIC file are left out of the JPG. Keep the original if you need that information.' },
+      { q: 'Will sideways photos come out rotated correctly?', a: 'Yes. The rotation stored in the HEIC file is applied while decoding, so the JPG shows the photo the way your iPhone does.' },
+      { q: 'What about Live Photos, bursts and portrait photos?', a: 'You get the main still image. The video part of a Live Photo is a separate file and depth maps are not converted.' },
+    ],
+  },
+  {
+    slug: 'heic-to-png',
+    from: 'heic',
+    to: 'png',
+    title: 'HEIC to PNG Converter – Free, Private, In Browser | Saveform',
+    description: 'Convert HEIC and HEIF images to lossless PNG in your browser. No upload, no sign-up, batch conversion with ZIP download.',
+    h1: 'HEIC to PNG converter',
+    lede: 'Convert HEIC and HEIF images into lossless PNG files for editing, design tools and documents. Decoding happens in your browser, so your photos stay on your device.',
+    explainerTitle: 'When PNG is the right target for a HEIC',
+    explainer: [
+      'PNG stores every pixel exactly, so it is a good working format when you will crop, retouch or annotate a photo several times, or when a tool simply asks for PNG. Each save after that loses nothing more.',
+      'The price is size: a 12-megapixel iPhone photo of a few megabytes as HEIC often becomes 15 MB or more as PNG. For sharing, emailing or uploading, <a href="../heic-to-jpg/">HEIC to JPG</a> gives files a fraction of that size with no visible difference.',
+      'This page loads a HEIC decoder (libheif, compiled to WebAssembly) from this site the first time you add a HEIC file and runs it in your browser. If the HEIC has a transparent area, as some edited or exported HEIF images do, the PNG keeps it.',
+    ],
+    faq: [
+      { q: 'Is the PNG better quality than the HEIC?', a: 'It is identical to the decoded HEIC. PNG adds no further loss, but it cannot restore detail the HEIC compression already removed.' },
+      { q: 'Why is the PNG so much bigger?', a: 'HEIC compresses photos very efficiently while PNG is lossless. For photos you only want to share, JPG is usually the better choice.' },
+      { q: 'Are my images uploaded?', a: 'No. The decoder runs in your browser tab and the PNG is created there. Nothing is sent to a server.' },
+      { q: 'Does it work on Windows and Chromebooks?', a: 'Yes. It works in current versions of Chrome, Edge, Firefox and Safari on any system, without installing codecs.' },
+    ],
+  },
+  {
+    slug: 'heic-to-pdf',
+    from: 'heic',
+    to: 'pdf',
+    title: 'HEIC to PDF Converter – Combine iPhone Photos | Saveform',
+    description: 'Turn HEIC photos into a PDF in your browser: one page per photo, A4, US Letter or photo-sized pages, combine many into one file. Nothing is uploaded.',
+    h1: 'HEIC to PDF converter',
+    lede: 'Make a PDF from iPhone HEIC photos, for example photos of receipts, forms or handwritten notes. Put them in order, pick the page size and download one PDF. Everything happens in your browser.',
+    explainerTitle: 'From phone photos to one document',
+    explainer: [
+      'Each photo becomes one page, in the order of the list; move rows with the ↑ and ↓ buttons, then click <em>Download one PDF</em>. You can mix HEIC with JPG, PNG and other images in the same document.',
+      'With <strong>A4</strong> or <strong>US Letter</strong>, each page is turned to suit its photo and the photo is centred inside a margin; <strong>Same as image</strong> makes each page exactly the size of its photo. Below 100% quality the photos are stored as JPEG inside the PDF, which keeps the file small enough to email.',
+      'The HEIC decoder (libheif, compiled to WebAssembly) is loaded from this site the first time you add a HEIC file and runs in your browser, so the photos are never uploaded. GPS location and camera details from the HEIC files are not copied into the PDF.',
+    ],
+    faq: [
+      { q: 'How do I combine several HEIC photos into one PDF?', a: 'Add all of them, check the order, move rows with the arrows if needed and click Download one PDF. Each photo becomes one page.' },
+      { q: 'Will the PDF be too large to email?', a: 'Each page is stored as a JPEG at the quality you pick, so a full-resolution iPhone photo takes a few megabytes. Lowering the quality to 75–80% makes the PDF noticeably smaller while photographed text stays readable; each row shows the size before you download.' },
+      { q: 'Are my photos uploaded?', a: 'No. Decoding and PDF creation both run in your browser tab.' },
+      { q: 'Are sideways photos rotated correctly?', a: 'Yes. The rotation saved by the iPhone is applied while decoding, so each page shows the photo upright.' },
     ],
   },
   {
@@ -513,7 +578,7 @@ export const converters = [
     ],
     faq: [
       { q: 'How do I combine several images into one PDF?', a: 'Add all of them, check the order in the list, move rows with the up and down arrows where needed, and click Download one PDF. Each image becomes one page, in the order shown.' },
-      { q: 'Can I mix JPG, PNG and WebP files in the same PDF?', a: 'Yes. Every file is decoded by your browser first, so any format it can open works, including GIF, SVG, BMP, AVIF and ICO. HEIC photos from iPhones are the usual exception: browsers generally cannot decode them, so export them as JPG first.' },
+      { q: 'Can I mix JPG, PNG and WebP files in the same PDF?', a: 'Yes. Every file is decoded by your browser first, so any format it can open works, including GIF, SVG, BMP, AVIF and ICO. HEIC photos from iPhones work too: the page decodes them itself, since most browsers cannot.' },
       { q: 'Can I put more than one image on a page?', a: 'No. This tool places exactly one image on each page. To get several pictures on a single page, arrange them in an image editor first and add the result here.' },
       { q: 'Is there a limit on the number of pages?', a: 'There is no fixed limit. All pages are held in memory while the PDF is put together, so a very large batch of big photos is limited by your device’s memory. A quality below 100% keeps both memory use and the PDF smaller.' },
       NO_UPLOAD,
@@ -680,4 +745,4 @@ export const converters = [
   },
 ];
 
-export const FORMAT_LABEL = { any: 'image', png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', svg: 'SVG', gif: 'GIF', bmp: 'BMP', ico: 'ICO', pdf: 'PDF', jfif: 'JFIF' };
+export const FORMAT_LABEL = { any: 'image', png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', svg: 'SVG', gif: 'GIF', bmp: 'BMP', ico: 'ICO', pdf: 'PDF', jfif: 'JFIF', heic: 'HEIC' };

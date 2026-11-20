@@ -30,9 +30,12 @@ export function sniffType(bytes) {
   if (ascii(0, 4) === 'GIF8') return 'gif';
   if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') return 'webp';
   if (ascii(4, 4) === 'ftyp') {
-    const brand = ascii(8, 4);
-    if (brand === 'avif' || brand === 'avis') return 'avif';
-    if (brand === 'heic' || brand === 'heix' || brand === 'mif1') return 'heic';
+    // Major brand, then the compatible brands listed after the minor version (box size from bytes 0-3).
+    const size = Math.min(b.length, ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) >>> 0);
+    const brands = [ascii(8, 4)];
+    for (let i = 16; i + 4 <= size; i += 4) brands.push(ascii(i, 4));
+    if (brands.some((x) => x === 'avif' || x === 'avis')) return 'avif';
+    if (brands.some((x) => ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'msf1'].includes(x))) return 'heic';
   }
   if (at(0, 0x42, 0x4d)) return 'bmp';
   if (at(0, 0x00, 0x00, 0x01, 0x00)) return 'ico';
@@ -74,10 +77,12 @@ function canvasToBlob(canvas, type, quality) {
 }
 
 /**
- * Decode a Blob into something drawable. Returns { source, width, height, close }.
+ * Decode a Blob into something drawable. Returns { source, width, height, kind, close }.
  * SVG needs a DOM (an <img>), so in a service worker it throws 'needs-dom'.
+ * `fallbackDecoders` maps a sniffed kind to an async (blob) => same shape, tried when the
+ * browser cannot decode it natively (the site uses this for HEIC; the extension passes none).
  */
-export async function decode(blob, { svgMinSize = 0 } = {}) {
+export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null } = {}) {
   const head = new Uint8Array(await blob.slice(0, 512).arrayBuffer());
   const kind = sniffType(head) || (blob.type.includes('svg') ? 'svg' : null);
   if (kind === 'svg') {
@@ -105,6 +110,8 @@ export async function decode(blob, { svgMinSize = 0 } = {}) {
     const bmp = await createImageBitmap(blob);
     return { source: bmp, width: bmp.width, height: bmp.height, kind, close: () => bmp.close && bmp.close() };
   } catch (err) {
+    const fallback = kind && fallbackDecoders?.[kind];
+    if (fallback) return fallback(blob);
     const e = new Error(kind ? `This browser cannot decode ${kind.toUpperCase()} images` : 'This file is not an image the browser can decode');
     e.code = 'decode-failed'; e.kind = kind; throw e;
   }

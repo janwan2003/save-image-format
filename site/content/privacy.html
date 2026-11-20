@@ -8,6 +8,7 @@
 <h2>The website</h2>
 <ul>
   <li>The converter pages decode and re-encode images inside your browser tab. Your files are not uploaded to any server.</li>
+  <li>HEIC photos are decoded by an open-source decoder (libheif, compiled to WebAssembly) that the page downloads from this site the first time you add a HEIC file. It runs inside your browser like the rest of the converter; the photo is not sent anywhere.</li>
   <li>The site loads only its own files (pages, one stylesheet, scripts, icons). It loads nothing from other domains: no fonts, no analytics, no trackers, no embedded content.</li>
   <li>The site sets no cookies and does not use local storage.</li>
   <li>The site is hosted on GitHub Pages. Like any web host, GitHub may record technical information such as IP addresses in its server logs to operate and secure the service; Saveform has no access to those logs. See GitHub’s own privacy statement for details.</li>

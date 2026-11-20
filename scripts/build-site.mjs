@@ -20,7 +20,7 @@ const UPDATED = process.env.SITE_UPDATED || new Date().toISOString().slice(0, 10
 const CSP = [
   "default-src 'self'",
   "img-src 'self' blob: data:",
-  "script-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'", // WebAssembly: the HEIC decoder (vendor/libheif)
   "style-src 'self'",
   "font-src 'self'",
   "connect-src 'self'",
@@ -74,7 +74,7 @@ function toolHtml(page) {
       ${ICON_UPLOAD}
       <span class="drop-title">Drop ${esc(fromLabel)} here</span>
       <span class="drop-sub"><span class="linkish">or choose files</span> · or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
-      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico">
+      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif">
     </label>
     <div class="controls">
       <label class="control" for="format"><span>Convert to</span><select id="format">${opts}</select></label>
@@ -335,6 +335,8 @@ async function main() {
   await Promise.all([
     copyFile(join(SITE, 'assets/style.css'), join(DIST, 'assets/style.css')),
     copyFile(join(SITE, 'assets/app.js'), join(DIST, 'assets/app.js')),
+    copyFile(join(SITE, 'assets/heic.js'), join(DIST, 'assets/heic.js')),
+    copyFile(join(SITE, 'assets/heic-worker.js'), join(DIST, 'assets/heic-worker.js')),
     copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
     copyFile(join(SITE, 'og-image.png'), join(DIST, 'og-image.png')),
@@ -343,6 +345,11 @@ async function main() {
     copyFile(join(ROOT, 'extension/lib/pdf.js'), join(DIST, 'lib/pdf.js')),
     copyFile(join(ROOT, 'extension/lib/gif.js'), join(DIST, 'lib/gif.js')),
   ]);
+  // HEIC decoder (LGPL, vendored unmodified; see site/vendor/libheif/README.md).
+  await mkdir(join(DIST, 'vendor/libheif'), { recursive: true });
+  for (const f of await readdir(join(SITE, 'vendor/libheif'))) {
+    await copyFile(join(SITE, 'vendor/libheif', f), join(DIST, 'vendor/libheif', f));
+  }
   await writeFile(join(DIST, '.nojekyll'), '');
   // Search Console ownership files (scripts/gsc.py token), served from the site root.
   for (const f of await readdir(join(SITE, 'verify')).catch(() => [])) {

@@ -22,6 +22,7 @@ const BASE_PATH = '/save-image-format';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript',
   '.mjs': 'text/javascript', '.svg': 'image/svg+xml', '.xml': 'application/xml', '.txt': 'text/plain',
+  '.wasm': 'application/wasm',
 };
 
 let server, origin, browser, context;
@@ -709,7 +710,7 @@ async function meanDifference(page, a, b) {
 
 test('png-to-gif, jpg-to-gif and webp-to-gif build with their own title, h1, canonical, sitemap entry and GIF controls', async () => {
   const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
-  assert.equal([...sitemap.matchAll(/<loc>/g)].length, 35, 'sitemap has 35 URLs (32 + 3 GIF pages)');
+  assert.equal([...sitemap.matchAll(/<loc>/g)].length, converters.length + guides.length + 2, 'sitemap lists every page (converters, guides, extension, privacy)');
   for (const slug of GIF_PAGES) {
     const entry = converters.find((c) => c.slug === slug);
     assert.ok(entry, `${slug} is in site/pages.mjs`);
@@ -800,6 +801,84 @@ test('webp-to-gif converts a transparent WebP', async () => {
   assert.equal((await pixelOfResult(page, 0, 3, 10))[3], 0);
   const [r, g, b, a] = await pixelOfResult(page, 0, 45, 10);
   assert.ok(a === 255 && Math.abs(r - 0x1e) < 8 && Math.abs(g - 0x88) < 8 && Math.abs(b - 0xe5) < 8, `opaque half stays blue, got ${[r, g, b, a]}`);
+  await page.close();
+});
+
+// HEIC fixtures made by scripts/make-heic-fixtures.mjs (our own HEIF writer around x265 output).
+// quadrants.heic: 64×48, red / green / blue / yellow quadrants (TL, TR, BL, BR).
+// grid-rotated.heic: 128×96 as a 2×2 tile grid with irot 90° anticlockwise, so it displays as 96×128
+// with green / yellow / red / blue quadrants.
+const HEIC_QUADRANTS = join(ROOT, 'tests/fixtures/quadrants.heic');
+const HEIC_GRID = join(ROOT, 'tests/fixtures/grid-rotated.heic');
+const near = (px, rgb, tol = 24) => rgb.every((v, i) => Math.abs(px[i] - v) <= tol);
+
+async function quadrantColours(page, w, h) {
+  const out = [];
+  for (const [x, y] of [[w / 4, h / 4], [(3 * w) / 4, h / 4], [w / 4, (3 * h) / 4], [(3 * w) / 4, (3 * h) / 4]]) {
+    out.push((await pixelOfResult(page, 0, x, y)).slice(0, 3));
+  }
+  return out;
+}
+
+test('heic-to-jpg decodes an HEIC photo with the WebAssembly decoder and writes a JPG with the right colours', async () => {
+  const requests = [];
+  const { page } = await openPage('/heic-to-jpg/');
+  page.on('request', (r) => requests.push(new URL(r.url()).pathname));
+  assert.equal(await page.locator('#format').inputValue(), 'jpg');
+  assert.ok(!requests.some((p) => p.includes('libheif')), 'decoder not loaded before a HEIC file is added');
+  await page.setInputFiles('#file', HEIC_QUADRANTS);
+  await waitForDone(page, 1);
+  assert.ok(requests.some((p) => p.endsWith('/vendor/libheif/libheif.wasm')), 'decoder loaded from this site');
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'quadrants.jpg');
+  assert.deepEqual(bytes.subarray(0, 3), Buffer.from([0xff, 0xd8, 0xff]));
+  assert.deepEqual(jpegSize(bytes), { width: 64, height: 48 });
+  const colours = await quadrantColours(page, 64, 48);
+  [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]].forEach((rgb, i) => assert.ok(near(colours[i], rgb), `quadrant ${i}: ${colours[i]} ≈ ${rgb}`));
+  assert.match(await page.locator('#results li').first().textContent(), /HEIC .* → JPG/);
+  await page.close();
+});
+
+test('heic-to-png applies the tile grid and the stored rotation (iPhone-style HEIC)', async () => {
+  const { page } = await openPage('/heic-to-png/');
+  await page.setInputFiles('#file', HEIC_GRID);
+  await waitForDone(page, 1);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'grid-rotated.png');
+  assert.deepEqual(bytes.subarray(0, 8), PNG_MAGIC);
+  assert.deepEqual([bytes.readUInt32BE(16), bytes.readUInt32BE(20)], [96, 128], 'rotated to portrait');
+  const colours = await quadrantColours(page, 96, 128);
+  [[0, 255, 0], [255, 255, 0], [255, 0, 0], [0, 0, 255]].forEach((rgb, i) => assert.ok(near(colours[i], rgb), `quadrant ${i}: ${colours[i]} ≈ ${rgb}`));
+  await page.close();
+});
+
+test('heic-to-pdf combines two HEIC photos into one 2-page PDF; a broken HEIC shows an error row', async () => {
+  const { page } = await openPage('/heic-to-pdf/');
+  assert.equal(await page.locator('#format').inputValue(), 'pdf');
+  await page.setInputFiles('#file', [HEIC_QUADRANTS, HEIC_GRID]);
+  await waitForDone(page, 2);
+  const { name, bytes } = await downloadBytes(page, '#download-pdf');
+  assert.equal(name, 'quadrants-and-1-more.pdf');
+  const pages = inspectPdf(bytes);
+  assert.equal(pages.length, 2);
+  assert.deepEqual(jpegSize(pages[0].data), { width: 64, height: 48 });
+  assert.deepEqual(jpegSize(pages[1].data), { width: 96, height: 128 });
+
+  const broken = (await readFile(HEIC_QUADRANTS)).subarray(0, 300); // container intact, image data cut off
+  await page.setInputFiles('#file', { name: 'broken.heic', mimeType: 'image/heic', buffer: broken });
+  await page.waitForSelector('#results li[data-state="error"]', { timeout: 15000 });
+  assert.match(await page.locator('#results li[data-state="error"]').textContent(), /iPhone/);
+  await page.close();
+});
+
+test('the general converter also accepts HEIC', async () => {
+  const { page } = await openPage('/');
+  assert.match(await page.locator('#file').getAttribute('accept'), /\.heic/);
+  await page.setInputFiles('#file', HEIC_QUADRANTS);
+  await waitForDone(page, 1);
+  const { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'quadrants.png');
+  assert.deepEqual([bytes.readUInt32BE(16), bytes.readUInt32BE(20)], [64, 48]);
   await page.close();
 });
 

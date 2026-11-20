@@ -4,7 +4,7 @@ Right-click an image → **Save image as** → **PNG / JPG / WebP / PDF** (and *
 write it), or **Copy as PNG**. Or click the toolbar button (Alt+Shift+S) to see every image on the page and save
 the ones you pick as separate files, one ZIP or one PDF. The conversion happens on your device, inside the browser.
 
-Website with free in-browser converters (WebP to PNG, AVIF to JPG, JPG to PDF, PNG to ICO, PNG to GIF, …):
+Website with free in-browser converters (WebP to PNG, HEIC to JPG, AVIF to JPG, JPG to PDF, PNG to ICO, PNG to GIF, …):
 https://janwan2003.github.io/save-image-format/
 
 ## Why trust it
@@ -61,4 +61,7 @@ python3 scripts/cws-upload.py      # uploads the Chrome zip to the Chrome Web St
 
 ## License
 
-MIT
+MIT, except `site/vendor/libheif/`: an unmodified WebAssembly build of [libheif](https://github.com/strukturag/libheif)
+(LGPL-3.0, from the npm package `libheif-js` 1.23.5) that the website loads only to decode HEIC photos. It is not part
+of the extension. Details and checksums in [`site/vendor/libheif/README.md`](site/vendor/libheif/README.md).
+`node scripts/make-heic-fixtures.mjs` rebuilds the two HEIC test files in `tests/fixtures/` (needs ffmpeg with libx265).
