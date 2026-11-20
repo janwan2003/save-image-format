@@ -434,6 +434,160 @@ test('png-to-ico writes a multi-size icon with embedded PNGs and transparency', 
   await page.close();
 });
 
+/** RGBA at each [x, y] of a PNG, decoded by the browser (used for PNG entries inside an ICO). */
+async function pngPixels(page, png, points) {
+  return page.evaluate(async ({ bytes, points }) => {
+    const bmp = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const g = c.getContext('2d');
+    g.drawImage(bmp, 0, 0);
+    return points.map(([x, y]) => [...g.getImageData(x, y, 1, 1).data]);
+  }, { bytes: [...png], points });
+}
+
+const NEW_PAGES = ['image-to-pdf', 'favicon-generator', 'jpg-to-ico', 'svg-to-ico', 'webp-to-ico'];
+
+test('image-to-pdf, favicon-generator and the jpg/svg/webp-to-ico pages build with their own title, h1, canonical and sitemap entry', async () => {
+  const sitemap = await readFile(join(DIST, 'sitemap.xml'), 'utf8');
+  for (const slug of NEW_PAGES) {
+    const entry = converters.find((c) => c.slug === slug);
+    assert.ok(entry, `${slug} is in site/pages.mjs`);
+    assert.ok(existsSync(join(DIST, slug, 'index.html')), `${slug}/index.html built`);
+    assert.ok(sitemap.includes(`<loc>https://janwan2003.github.io/save-image-format/${slug}/</loc>`), `${slug} in sitemap`);
+    const { page, resp } = await openPage(`/${slug}/`);
+    assert.equal(resp.status(), 200);
+    assert.equal(await page.title(), entry.title);
+    assert.equal(await page.locator('h1').textContent(), entry.h1);
+    assert.equal(await page.locator('link[rel=canonical]').getAttribute('href'), `https://janwan2003.github.io/save-image-format/${slug}/`);
+    assert.equal(await page.locator('#format').inputValue(), entry.to, `${slug} defaults to ${entry.to}`);
+    assert.equal(await page.locator('.links-grid a[aria-current="page"]').count(), 1, `${slug} marks itself in the converter list`);
+    const ticked = await page.locator('input[name="ico-size"]:checked').evaluateAll((bs) => bs.map((b) => Number(b.value)));
+    assert.deepEqual(ticked, slug === 'favicon-generator' ? [16, 32, 48] : [16, 32, 48, 256]);
+    await page.close();
+  }
+  const { page } = await openPage('/');
+  const labels = await page.locator('.links-grid a').allTextContents();
+  for (const l of ['Image to PDF', 'Favicon generator', 'JPG to ICO', 'SVG to ICO', 'WebP to ICO']) assert.ok(labels.includes(l), `index links "${l}"`);
+  await page.close();
+});
+
+test('favicon-generator writes a 16/32/48 px favicon.ico from a PNG, and adds 256 px when ticked', async () => {
+  const { page } = await openPage('/favicon-generator/');
+  assert.equal(await page.locator('#ico-control').isVisible(), true);
+  const png = await makeFixture(page, 'image/png', 64, 64); // left half transparent, right half blue
+  await page.setInputFiles('#file', { name: 'logo.png', mimeType: 'image/png', buffer: png });
+  await waitForDone(page, 1);
+  let { name, bytes } = await downloadBytes(page, '#results a.btn');
+  assert.equal(name, 'logo.ico');
+  let entries = inspectIco(bytes);
+  assert.deepEqual(entries.map((e) => [e.size, e.height]), [[16, 16], [32, 32], [48, 48]]);
+  for (const e of entries) {
+    assert.deepEqual(e.bytes.subarray(0, 8), PNG_MAGIC, `${e.size}px entry is a PNG`);
+    assert.deepEqual([e.bytes.readUInt32BE(16), e.bytes.readUInt32BE(20)], [e.size, e.size]);
+  }
+  const [left, right] = await pngPixels(page, entries[1].bytes, [[4, 16], [28, 16]]);
+  assert.equal(left[3], 0, '32px entry keeps the transparent half');
+  assert.deepEqual(right, [0x1e, 0x88, 0xe5, 255], '32px entry keeps the opaque colour');
+
+  const oldHref = await page.locator('#results a.btn').getAttribute('href');
+  await page.check('input[name="ico-size"][value="256"]');
+  // Settings changes re-convert after a short debounce; wait for the new blob URL.
+  await page.waitForFunction((old) => { const a = document.querySelector('#results a.btn'); return a?.getAttribute('href') && a.getAttribute('href') !== old; }, oldHref);
+  await waitForDone(page, 1);
+  ({ name, bytes } = await downloadBytes(page, '#results a.btn'));
+  entries = inspectIco(bytes);
+  assert.deepEqual(entries.map((e) => e.size), [16, 32, 48, 256]);
+  assert.equal(bytes[6 + 3 * 16], 0, 'ICO directory stores 256 as 0');
+  assert.equal(entries[3].bytes.readUInt32BE(16), 256);
+  await page.close();
+});
+
+test('image-to-pdf combines a PNG and a WebP into one 2-page PDF in list order', async () => {
+  const { page } = await openPage('/image-to-pdf/');
+  assert.equal(await page.locator('#format').inputValue(), 'pdf');
+  assert.equal(await page.locator('#page-size').inputValue(), 'a4');
+  assert.equal(await page.locator('#download-pdf').evaluate((b) => b.hidden), false, 'Download one PDF button is not hidden on a PDF page');
+  assert.equal(await page.locator('#svg-size').count(), 1, 'SVG size option shown for any-format input');
+  assert.match(await page.locator('#how').textContent(), /combine images into one PDF/);
+  const png = await makeFixture(page, 'image/png', 300, 200);
+  const webp = await makeFixture(page, 'image/webp', 120, 160);
+  assert.equal(webp.subarray(8, 12).toString('latin1'), 'WEBP');
+  await page.setInputFiles('#file', [
+    { name: 'chart.png', mimeType: 'image/png', buffer: png },
+    { name: 'photo.webp', mimeType: 'image/webp', buffer: webp },
+  ]);
+  await waitForDone(page, 2);
+  assert.match(await page.locator('#download-pdf').textContent(), /2 pages/);
+  const metas = await page.locator('#results .result-meta').allTextContents();
+  assert.match(metas[0], /^PNG .* → PDF .*300 × 200 px/);
+  assert.match(metas[1], /^WebP .* → PDF .*120 × 160 px/);
+
+  const { name, bytes } = await downloadBytes(page, '#download-pdf');
+  assert.equal(name, 'chart-and-1-more.pdf');
+  const pages = inspectPdf(bytes);
+  assert.equal(pages.length, 2);
+  assert.deepEqual(pages.map((p) => [p.width, p.height]), [[300, 200], [120, 160]], 'pages follow list order');
+  assert.deepEqual(pages.map((p) => p.mediaBox), [[0, 0, 841.89, 595.28], [0, 0, 595.28, 841.89]], 'landscape then portrait A4');
+  assert.deepEqual(pages.map((p) => p.filter), ['DCTDecode', 'DCTDecode']);
+  assert.deepEqual(jpegSize(pages[1].data), { width: 120, height: 160 });
+
+  // Reorder: the WebP becomes page 1.
+  await page.click('#results li:nth-child(2) .move');
+  const swapped = inspectPdf((await downloadBytes(page, '#download-pdf')).bytes);
+  assert.deepEqual(swapped.map((p) => [p.width, p.height]), [[120, 160], [300, 200]]);
+  if (popplerAvailable()) {
+    const r = renderFirstPage(bytes); // page 1 of the first PDF: the PNG, landscape A4
+    assert.deepEqual([r.width, r.height], [1123, 794], 'landscape A4 at 96 dpi');
+    const cx = Math.round(r.width / 2), cy = Math.round(r.height / 2);
+    const right = r.rgb(cx + 60, cy), left = r.rgb(cx - 60, cy);
+    assert.ok(right[2] > 180 && right[0] < 80, `blue half right of centre, got ${right}`);
+    assert.ok(left.every((v) => v > 240), `transparent half filled with the white background, got ${left}`);
+  } else {
+    console.log('# pdftoppm not installed: PDF rendering check skipped');
+  }
+  await page.close();
+});
+
+test('svg-to-ico draws each size from the vector; webp-to-ico keeps alpha; jpg-to-ico writes PNG entries', async () => {
+  const { page } = await openPage('/svg-to-ico/');
+  // Declared 16×16, left half black: the 256 px entry must still have a hard edge at x = 128.
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="8" height="16" fill="#000"/></svg>');
+  await page.setInputFiles('#file', { name: 'mark.svg', mimeType: 'image/svg+xml', buffer: svg });
+  await waitForDone(page, 1);
+  let out = await downloadBytes(page, '#results a.btn');
+  assert.equal(out.name, 'mark.ico');
+  let entries = inspectIco(out.bytes);
+  assert.deepEqual(entries.map((e) => e.size), [16, 32, 48, 256]);
+  const alphas = (await pngPixels(page, entries[3].bytes, [[126, 50], [127, 50], [128, 50], [129, 50]])).map((p) => p[3]);
+  assert.deepEqual(alphas, [255, 255, 0, 0], `256px entry has a sharp vector edge, got ${alphas}`);
+  await page.close();
+
+  const webpPage = (await openPage('/webp-to-ico/')).page;
+  const webp = await makeFixture(webpPage, 'image/webp', 48, 48);
+  await webpPage.setInputFiles('#file', { name: 'site-logo.webp', mimeType: 'image/webp', buffer: webp });
+  await waitForDone(webpPage, 1);
+  out = await downloadBytes(webpPage, '#results a.btn');
+  assert.equal(out.name, 'site-logo.ico');
+  entries = inspectIco(out.bytes);
+  const [l, r] = await pngPixels(webpPage, entries.find((e) => e.size === 48).bytes, [[5, 24], [42, 24]]);
+  assert.equal(l[3], 0, 'transparent WebP pixels stay transparent');
+  assert.equal(r[3], 255);
+  await webpPage.close();
+
+  const jpgPage = (await openPage('/jpg-to-ico/')).page;
+  const jpeg = await makeFixture(jpgPage, 'image/jpeg', 100, 50);
+  await jpgPage.setInputFiles('#file', { name: 'photo.jpg', mimeType: 'image/jpeg', buffer: jpeg });
+  await waitForDone(jpgPage, 1);
+  out = await downloadBytes(jpgPage, '#results a.btn');
+  entries = inspectIco(out.bytes);
+  assert.deepEqual(entries.map((e) => e.size), [16, 32, 48, 256]);
+  for (const e of entries) assert.deepEqual(e.bytes.subarray(0, 8), PNG_MAGIC);
+  const [pad, photo] = await pngPixels(jpgPage, entries[2].bytes, [[24, 2], [24, 24]]);
+  assert.equal(pad[3], 0, 'padding around a wide JPG is transparent');
+  assert.equal(photo[3], 255, 'the JPG itself is opaque');
+  await jpgPage.close();
+});
+
 test('jfif-to-jpg keeps the JPEG bytes unchanged; unticking re-encodes', async () => {
   const { page } = await openPage('/jfif-to-jpg/');
   assert.equal(await page.locator('#keep-jpeg').isChecked(), true);

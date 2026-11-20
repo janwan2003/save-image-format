@@ -46,6 +46,9 @@ function jsonLd(obj) {
   return `<script type="application/ld+json">${JSON.stringify(obj).replace(/</g, '\\u003c')}</script>\n`;
 }
 
+// Link text for a converter page: "WebP to PNG", or the page's own label (e.g. "Favicon generator").
+const linkLabel = (p) => p.linkLabel || `${FORMAT_LABEL[p.from]} to ${FORMAT_LABEL[p.to]}`;
+
 const pagePath = (slug) => (slug ? `${slug}/` : '');
 const pageUrl = (slug) => new URL(pagePath(slug), SITE_URL).href;
 
@@ -59,12 +62,12 @@ function toolHtml(page) {
   const pageSizes = Object.entries({ a4: 'A4', letter: 'US Letter', fit: 'Same as image' })
     .map(([id, label]) => `<option value="${id}"${id === (page.pageSize || 'a4') ? ' selected' : ''}>${label}</option>`).join('');
   const icoSizes = [16, 32, 48, 64, 128, 256]
-    .map((n) => `<label class="chip"><input type="checkbox" name="ico-size" value="${n}"${[16, 32, 48, 256].includes(n) ? ' checked' : ''}>${n}</label>`).join('');
+    .map((n) => `<label class="chip"><input type="checkbox" name="ico-size" value="${n}"${(page.icoSizes || [16, 32, 48, 256]).includes(n) ? ' checked' : ''}>${n}</label>`).join('');
   const keepJpeg = page.keepJpegOption ? `
       <label class="control" id="keep-jpeg-control" for="keep-jpeg"><input type="checkbox" id="keep-jpeg" checked><span>Keep the original JPEG data (rename only, no quality loss)</span></label>` : '';
   const svg = page.svgOption ? `
       <label class="control" for="svg-size"><span>SVG size</span><input type="number" id="svg-size" min="16" max="8192" step="1" value="1024"> px</label>` : '';
-  return `<div class="tool" data-tool${page.from === 'any' ? ' data-general' : ''}>
+  return `<div class="tool" data-tool${page.slug === '' ? ' data-general' : ''}>
     <label class="drop" id="drop" for="file">
       ${ICON_UPLOAD}
       <span class="drop-title">Drop ${esc(fromLabel)} here</span>
@@ -104,10 +107,10 @@ function stepsHtml(page) {
     ? '<li><strong>Download</strong>Click Download one PDF to get every image as a page of a single file, or save each page as its own PDF.</li>'
     : `<li><strong>Download</strong>Save each ${esc(to)} with its Download button, or all of them at once with Download all (ZIP).</li>`;
   return `<section class="section" aria-labelledby="how">
-  <h2 id="how">How to convert ${page.from === 'any' ? 'an image' : `${FORMAT_LABEL[page.from]} to ${to}`}</h2>
+  <h2 id="how">${esc(page.howTitle || `How to convert ${page.from === 'any' ? 'an image' : `${FORMAT_LABEL[page.from]} to ${to}`}`)}</h2>
   <ol class="steps">
     <li><strong>Add ${esc(from)}</strong>Drop them on the box above, click to choose them, or paste an image from the clipboard. You can add many at once.</li>
-    <li><strong>Check the settings</strong>${page.from === 'any' ? 'Pick the output format. ' : ''}${esc(lossyHint)}</li>
+    <li><strong>Check the settings</strong>${page.slug === '' ? 'Pick the output format. ' : ''}${esc(lossyHint)}</li>
     ${lastStep}
   </ol>
 </section>`;
@@ -124,7 +127,7 @@ function faqHtml(page) {
 function converterLinks(root, currentSlug) {
   const links = converters.filter((p) => p.slug).map((p) => {
     const cur = p.slug === currentSlug ? ' aria-current="page"' : '';
-    return `<li><a href="${root}${p.slug}/"${cur}>${FORMAT_LABEL[p.from]} to ${FORMAT_LABEL[p.to]}</a></li>`;
+    return `<li><a href="${root}${p.slug}/"${cur}>${esc(linkLabel(p))}</a></li>`;
   });
   links.push(`<li><a href="${root}"${currentSlug === '' ? ' aria-current="page"' : ''}>Any image to any format</a></li>`);
   return `<ul class="links-grid">\n  ${links.join('\n  ')}\n</ul>`;
@@ -147,7 +150,7 @@ function guideMain(guide, root, logo) {
   const convs = guide.converters.map((slug) => {
     const c = converters.find((x) => x.slug === slug);
     if (!c) throw new Error(`Unknown converter ${slug}`);
-    return `<li><a href="${root}${c.slug}/">${FORMAT_LABEL[c.from]} to ${FORMAT_LABEL[c.to]}</a></li>`;
+    return `<li><a href="${root}${c.slug}/">${esc(linkLabel(c))}</a></li>`;
   }).join('\n  ');
   return `<article>
 <section class="hero">
@@ -260,7 +263,7 @@ async function main() {
     const appLd = {
       '@context': 'https://schema.org',
       '@type': 'WebApplication',
-      name: page.slug ? `Saveform ${FORMAT_LABEL[page.from]} to ${FORMAT_LABEL[page.to]} converter` : 'Saveform image converter',
+      name: page.appName || (page.slug ? `Saveform ${linkLabel(page)} converter` : 'Saveform image converter'),
       url: pageUrl(page.slug),
       applicationCategory: 'MultimediaApplication',
       operatingSystem: 'Any (runs in a web browser)',
