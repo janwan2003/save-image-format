@@ -383,4 +383,4 @@ The site's converter pages could later carry one unobtrusive ad slot.
   JPEG/PackBits, CMYK, YCbCr, ICC → sRGB) + /tiff-to-jpg/, /tiff-to-png/, /tiff-to-pdf/; subagent: /guides/ index with compact footer and
   store screenshot 2 (save-all popup); sitemap 42 → 46. Evidence: Actions run 44761479754 116/116 (first push failed 115/116 on a real
   390 px nav wrap, fixed), Pages run 44761479874, libtiff's 61-file sample set vs ImageMagick/Pillow, live 6-page TIFF→PDF in 777 ms,
-  IndexNow 46 URLs.
+  IndexNow 46 URLs. Final run 44761975205 on d04fbb5: 116/116, Pages run 44761975388.
