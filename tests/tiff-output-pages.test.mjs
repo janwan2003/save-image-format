@@ -87,7 +87,7 @@ test('the TIFF-output pages are defined like the other converters', () => {
     assert.equal(entry.explainer.length, 3, `${slug} has 3 explainer paragraphs`);
     assert.equal(entry.faq.length, 5, `${slug} has 5 FAQ entries`);
   }
-  assert.ok(!converters.some((c) => c.slug === 'pdf-to-tiff'), 'no PDF input page (PDF input is not supported)');
+  assert.equal(converters.find((c) => c.slug === 'pdf-to-tiff')?.from, 'pdf', 'pdf-to-tiff takes PDF input (session 11)');
 });
 
 test('each TIFF-output page returns 200 with its title, h1, canonical, sitemap entry and no console errors', async () => {

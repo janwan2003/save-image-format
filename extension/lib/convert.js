@@ -42,6 +42,7 @@ export function sniffType(bytes) {
     if (brands.some((x) => ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'msf1'].includes(x))) return 'heic';
   }
   if (at(0, 0x49, 0x49, 0x2a, 0x00) || at(0, 0x4d, 0x4d, 0x00, 0x2a) || at(0, 0x49, 0x49, 0x2b, 0x00) || at(0, 0x4d, 0x4d, 0x00, 0x2b)) return 'tiff';
+  if (ascii(0, Math.min(b.length, 1024)).includes('%PDF-')) return 'pdf'; // header may follow a few junk bytes
   if (at(0, 0x42, 0x4d)) return 'bmp';
   if (at(0, 0x00, 0x00, 0x01, 0x00)) return 'ico';
   if (at(0, 0xff, 0x0a) || ascii(4, 4) === 'JXL ') return 'jxl';

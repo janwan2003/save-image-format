@@ -5,7 +5,7 @@
 // index, plus site/content/*.html (privacy, extension, 404), all rendered through site/template.html.
 // The conversion engine is copied from extension/lib so the site and the
 // extension run the exact same code.
-import { mkdir, readFile, readdir, writeFile, copyFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, copyFile, rm, cp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { converters, SITE_URL, REPO_URL, FORMAT_LABEL } from '../site/pages.mjs';
@@ -20,7 +20,7 @@ const UPDATED = process.env.SITE_UPDATED || new Date().toISOString().slice(0, 10
 const CSP = [
   "default-src 'self'",
   "img-src 'self' blob: data:",
-  "script-src 'self' 'wasm-unsafe-eval'", // WebAssembly: the HEIC decoder (vendor/libheif)
+  "script-src 'self' 'wasm-unsafe-eval'", // WebAssembly: the HEIC decoder (vendor/libheif), PDF.js image decoders (vendor/pdfjs)
   "style-src 'self'",
   "font-src 'self'",
   "connect-src 'self'",
@@ -84,14 +84,18 @@ function toolHtml(page) {
       <label class="control" id="keep-jpeg-control" for="keep-jpeg"><input type="checkbox" id="keep-jpeg" checked><span>Keep the original JPEG data (rename only, no quality loss)</span></label>` : '';
   const dither = `
       <label class="control" id="dither-control" for="dither"><input type="checkbox" id="dither" checked><span>Dither (smoother photos and gradients)</span></label>`;
+  const dpis = [[72, '72 dpi (screen)'], [150, '150 dpi'], [200, '200 dpi'], [300, '300 dpi (print)']]
+    .map(([n, label]) => `<option value="${n}"${n === (page.pdfDpi || 150) ? ' selected' : ''}>${label}</option>`).join('');
+  const pdfDpi = `
+      <label class="control" id="pdf-dpi-control" for="pdf-dpi"${page.from === 'pdf' ? '' : ' hidden'}><span>PDF resolution</span><select id="pdf-dpi">${dpis}</select></label>`;
   const svg = page.svgOption ? `
       <label class="control" for="svg-size"><span>SVG size</span><input type="number" id="svg-size" min="16" max="8192" step="1" value="1024"> px</label>` : '';
-  return `<div class="tool" data-tool${page.slug === '' ? ' data-general' : ''}>
+  return `<div class="tool" data-tool${page.slug === '' ? ' data-general' : ''}${page.from === 'pdf' ? ' data-pdf-input' : ''}>
     <label class="drop" id="drop" for="file">
       ${ICON_UPLOAD}
       <span class="drop-title">Drop ${esc(fromLabel)} here</span>
       <span class="drop-sub"><span class="linkish">or choose files</span> · or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
-      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff">
+      <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff,.pdf,application/pdf">
     </label>
     <div class="controls">
       <label class="control" for="format"><span>Convert to</span><select id="format">${opts}</select></label>
@@ -99,7 +103,7 @@ function toolHtml(page) {
       <label class="control" id="bg-control" for="bg"><span>Background</span><input type="color" id="bg" value="#ffffff"></label>
       <label class="control" id="page-size-control" for="page-size"><span>Page size</span><select id="page-size">${pageSizes}</select></label>
       <label class="control" id="tiff-control" for="tiff-compression"><span>Compression</span><select id="tiff-compression"><option value="lzw" selected>LZW (smaller)</option><option value="none">None (uncompressed)</option></select></label>
-      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${keepJpeg}${resize}${dither}${svg}
+      <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${pdfDpi}${keepJpeg}${resize}${dither}${svg}
     </div>
     <p class="note" id="format-note" role="status" hidden></p>
     <p class="local-note">${ICON_LOCK}Converted on your device. Nothing is uploaded.</p>
@@ -423,6 +427,7 @@ async function main() {
     copyFile(join(SITE, 'assets/tiff.js'), join(DIST, 'assets/tiff.js')),
     copyFile(join(SITE, 'assets/tiff-worker.js'), join(DIST, 'assets/tiff-worker.js')),
     copyFile(join(SITE, 'assets/tiff-client.js'), join(DIST, 'assets/tiff-client.js')),
+    copyFile(join(SITE, 'assets/pdf-client.js'), join(DIST, 'assets/pdf-client.js')),
     copyFile(join(SITE, 'assets/icc.js'), join(DIST, 'assets/icc.js')),
     copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
@@ -439,6 +444,8 @@ async function main() {
   for (const f of await readdir(join(SITE, 'vendor/libheif'))) {
     await copyFile(join(SITE, 'vendor/libheif', f), join(DIST, 'vendor/libheif', f));
   }
+  // PDF renderer (Apache-2.0, vendored unmodified; see site/vendor/pdfjs/README.md).
+  await cp(join(SITE, 'vendor/pdfjs'), join(DIST, 'vendor/pdfjs'), { recursive: true });
   await writeFile(join(DIST, '.nojekyll'), '');
   // Search Console ownership files (scripts/gsc.py token), served from the site root.
   for (const f of await readdir(join(SITE, 'verify')).catch(() => [])) {

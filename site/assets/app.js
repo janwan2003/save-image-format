@@ -8,11 +8,13 @@ import { baseNameFromUrl } from '../lib/filename.js';
 import { makeZip } from '../lib/zip.js';
 import { decodeHeic } from './heic.js';
 import { decodeTiff, tiffPageCount } from './tiff-client.js';
+import { decodePdf, pdfPageCount, closePdf } from './pdf-client.js';
 
 // Formats the browser may not decode itself. HEIC (iPhone photos) goes to a WebAssembly
 // decoder that is only downloaded when the first HEIC file is added; TIFF to our own decoder.
-const FALLBACK_DECODERS = { heic: decodeHeic, tiff: decodeTiff };
+const FALLBACK_DECODERS = { heic: decodeHeic, tiff: decodeTiff, pdf: (b) => decodePdf(b, 0) };
 const MAX_TIFF_PAGES = 500;
+const MAX_PDF_PAGES = 500;
 
 // Formats that "Max file size" works for (quality search, palette PNG, then smaller dimensions).
 const TARGET_FORMATS = new Set(['jpg', 'webp', 'avif', 'png', 'same']);
@@ -60,6 +62,8 @@ function init(root) {
   const targetCtl = $('#target-control');
   const pngColors = $('#png-colors');
   const pngColorsCtl = $('#png-colors-control');
+  const pdfDpi = $('#pdf-dpi');
+  const pdfDpiCtl = $('#pdf-dpi-control');
   const bar = $('#results-bar');
   const status = $('#status');
   const list = $('#results');
@@ -88,6 +92,7 @@ function init(root) {
       : null,
     targetBytes: targetOn?.checked && TARGET_FORMATS.has(formatSel.value) ? clampInt(targetKb.value, 1, 1e5, 100) * 1024 : 0,
     pngColors: pngColors ? Number(pngColors.value) || 0 : 0,
+    pdfDpi: pdfDpi ? clampInt(pdfDpi.value, 36, 600, 150) : 150,
   });
 
   function syncControls() {
@@ -105,6 +110,8 @@ function init(root) {
     }
     if (pngColorsCtl) pngColorsCtl.hidden = !(fmt.id === 'png' || fmt.id === 'same');
     if (keepJpegCtl) keepJpegCtl.hidden = fmt.id !== 'jpg';
+    // PDF resolution: shown on the PDF pages, and elsewhere once a PDF has been added.
+    if (pdfDpiCtl) pdfDpiCtl.hidden = !(root.hasAttribute('data-pdf-input') || items.some((i) => i.pdf));
     qualityCtl.hidden = !fmt.lossy || keeping;
     bgCtl.hidden = !fmt.opaque || keeping;
     pageSizeCtl.hidden = fmt.id !== 'pdf';
@@ -168,16 +175,23 @@ function init(root) {
   for (const input of [resizeW, resizeH, resizePct, targetKb]) input?.addEventListener('input', () => settingsChanged(500));
   targetOn?.addEventListener('change', () => settingsChanged());
   pngColors?.addEventListener('change', () => settingsChanged());
+  pdfDpi?.addEventListener('change', () => {
+    items.filter((i) => i.pdf).forEach(enqueue); // only PDF pages depend on it
+  });
 
   // ---- adding files -------------------------------------------------------
-  // A multi-page TIFF (scans, faxes) becomes one row per page, in page order.
+  // A multi-page TIFF (scans, faxes) or a PDF becomes one row per page, in page order.
   async function expand(file) {
-    if (sniffType(new Uint8Array(await file.slice(0, 8).arrayBuffer())) !== 'tiff') return [{ file, label: file.name }];
+    const kind = sniffType(new Uint8Array(await file.slice(0, 1024).arrayBuffer()));
+    if (kind !== 'tiff' && kind !== 'pdf') return [{ file, label: file.name }];
+    const pdf = kind === 'pdf';
     let pages = 1;
-    try { pages = Math.min(MAX_TIFF_PAGES, await tiffPageCount(file)); } catch { /* the conversion reports the error */ }
-    if (pages < 2) return [{ file, label: file.name }];
+    try {
+      pages = pdf ? Math.min(MAX_PDF_PAGES, await pdfPageCount(file)) : Math.min(MAX_TIFF_PAGES, await tiffPageCount(file));
+    } catch { /* the conversion reports the error */ }
+    if (pages < 2) return [{ file, label: file.name, ...(pdf ? { pdf, page: 0 } : {}) }];
     const stem = file.name.replace(/\.[^.]*$/, '') || 'image';
-    return Array.from({ length: pages }, (_, page) => ({ file, page, label: `${file.name} (page ${page + 1} of ${pages})`, outName: `${stem}-page-${page + 1}` }));
+    return Array.from({ length: pages }, (_, page) => ({ file, page, pages, pdf, label: `${file.name} (page ${page + 1} of ${pages})`, outName: `${stem}-page-${page + 1}` }));
   }
 
   let adding = Promise.resolve();
@@ -195,6 +209,7 @@ function init(root) {
           added.push(item);
         }
       }
+      if (added.some((i) => i.pdf)) syncControls();
       added.forEach(enqueue);
       updateBar();
     });
@@ -251,7 +266,9 @@ function init(root) {
       renderRow(item);
       updateBar();
       try {
-        const decoders = item.page != null ? { ...FALLBACK_DECODERS, tiff: (b) => decodeTiff(b, item.page) } : FALLBACK_DECODERS;
+        const decoders = item.page != null
+          ? { ...FALLBACK_DECODERS, tiff: (b) => decodeTiff(b, item.page), pdf: () => decodePdf(item.file, item.page, { dpi: opts.pdfDpi }) }
+          : FALLBACK_DECODERS;
         const format = opts.format === 'same' ? await sameFormat(item) : opts.format;
         let r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, format, { ...opts, preview: true, fallbackDecoders: decoders, preferFallback: item.page != null });
         // "Same as original" is for making files smaller: if re-encoding did not help, keep the file.
@@ -284,6 +301,7 @@ function init(root) {
     item.removed = true;
     revoke(item);
     if (item.preview) URL.revokeObjectURL(item.preview);
+    if (item.pdf && !items.some((i) => i !== item && !i.removed && i.file === item.file)) closePdf(item.file);
   }
 
   // ---- result rows --------------------------------------------------------
@@ -343,7 +361,7 @@ function init(root) {
       if (r.format !== 'pdf' && r.format !== 'tiff') thumb.src = r.url;
       else if (r.preview) thumb.src = (item.pdfThumb ||= URL.createObjectURL(r.preview));
       else if (r.pdfPage?.filter === 'DCTDecode') thumb.src = (item.pdfThumb ||= URL.createObjectURL(new Blob([r.pdfPage.data], { type: 'image/jpeg' })));
-      else if (r.sourceKind === 'heic' || r.sourceKind === 'tiff') thumb.removeAttribute('src');
+      else if (r.sourceKind === 'heic' || r.sourceKind === 'tiff' || r.sourceKind === 'pdf') thumb.removeAttribute('src');
       else thumb.src = (item.preview ||= URL.createObjectURL(item.file));
       const before = item.file.size, after = r.blob.size;
       const pct = Math.round(((after - before) / before) * 100);
@@ -353,9 +371,11 @@ function init(root) {
       if (r.targetBytes && r.targetMet === false) {
         extra.push(' · ', Object.assign(el('span', 'warn'), { textContent: `could not get under ${fmtBytes(r.targetBytes)}; this is the smallest version` }));
       }
+      // One page of a multi-page file: comparing with the whole file's size would mislead.
+      const partOf = item.pages > 1;
       meta.replaceChildren(
-        `${kindLabel(r.sourceKind, item.file)} ${fmtBytes(before)} → ${FORMATS[r.format].label} ${fmtBytes(after)} `,
-        r.kept ? '(original JPEG data kept)' : r.keptOriginal ? '(original kept: re-saving did not make it smaller)' : Object.assign(el('span', pct < 0 ? 'smaller' : 'larger'), { textContent: `(${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)}%)` }),
+        partOf ? `${kindLabel(r.sourceKind, item.file)} page ${item.page + 1} → ${FORMATS[r.format].label} ${fmtBytes(after)}` : `${kindLabel(r.sourceKind, item.file)} ${fmtBytes(before)} → ${FORMATS[r.format].label} ${fmtBytes(after)} `,
+        partOf ? '' : r.kept ? '(original JPEG data kept)' : r.keptOriginal ? '(original kept: re-saving did not make it smaller)' : Object.assign(el('span', pct < 0 ? 'smaller' : 'larger'), { textContent: `(${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)}%)` }),
         r.resized ? ` · ${r.sourceWidth} × ${r.sourceHeight} → ${r.width} × ${r.height} px` : ` · ${r.width} × ${r.height} px`,
         ...extra,
       );
@@ -433,6 +453,7 @@ function init(root) {
     queue.length = 0;
     list.replaceChildren();
     updateBar();
+    syncControls();
     fileInput.focus();
   });
 
@@ -447,6 +468,7 @@ async function sameFormat(item) {
   if (kind === 'webp' && (await canEncode('image/webp'))) return 'webp';
   if (kind === 'avif') return (await canEncode('image/avif')) ? 'avif' : 'jpg';
   if (kind === 'tiff') return 'tiff';
+  if (kind === 'pdf') return 'jpg'; // pages are mostly scans or text: JPG keeps them small
   return 'png'; // PNG, GIF (first frame), SVG, BMP, ICO
 }
 
@@ -493,7 +515,7 @@ function uniqueName(name, used) {
 
 function kindLabel(kind, file) {
   if (kind === 'jpeg' && /\.jfif$/i.test(file.name)) return 'JFIF';
-  const labels = { png: 'PNG', jpeg: 'JPG', gif: 'GIF', webp: 'WebP', avif: 'AVIF', svg: 'SVG', bmp: 'BMP', ico: 'ICO', heic: 'HEIC', tiff: 'TIFF' };
+  const labels = { png: 'PNG', jpeg: 'JPG', gif: 'GIF', webp: 'WebP', avif: 'AVIF', svg: 'SVG', bmp: 'BMP', ico: 'ICO', heic: 'HEIC', tiff: 'TIFF', pdf: 'PDF' };
   if (labels[kind]) return labels[kind];
   const ext = file.name.split('.').pop();
   return ext && ext !== file.name ? ext.toUpperCase() : 'Image';

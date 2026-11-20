@@ -169,6 +169,18 @@ PNG→PNG, WebP→WebP, HEIC→JPG, others→PNG) and keep the input file untouc
 `resize`, `targetBytes`, `pngColors` in `convertBlob` (`outputSize()` exported). New pages (subagent content): /compress-image/, /compress-jpg/,
 /compress-png/, /resize-image/, /compress-image-to-100kb/, /-50kb/, /-20kb/, listed under "Compress and resize" on /guides/. The extension
 does not use the new options; its `convert.js` now imports `png-quant.js` (extension tests passed with it in CI; not repacked or uploaded).
+**PDF input (session 11):** every converter page now takes PDF files: each page becomes one row (`name (page k of N)`, output
+`name-page-k.ext`, up to 500 pages), drawn by **PDF.js** (Mozilla's PDF engine, the one inside Firefox's viewer; npm `pdfjs-dist`
+6.5.438, Apache-2.0, vendored unmodified in `site/vendor/pdfjs/` with SHA-256 in its README; the two `.mjs` files renamed `.js` for
+MIME types) via `site/assets/pdf-client.js`, downloaded only when the first PDF is added (live size: about 510 KB gzipped for the two
+scripts). A **PDF resolution** select (72 / 150 default / 200 / 300 dpi) is shown on PDF pages and elsewhere once a PDF is added;
+changing it redraws only PDF rows. Pages are drawn on white with the 14 standard fonts from PDF.js's bundled font files
+(`useSystemFonts: false`, so output does not depend on the computer), capped at 16,384 px a side and 50 MP. Password-protected and
+invalid PDFs give clear error rows. `sniffType` in `extension/lib/convert.js` returns `pdf` (`%PDF-` in the first 1 KB); the extension
+itself only gets a clearer error for a PDF. New pages: /pdf-to-jpg/, /pdf-to-png/, /pdf-to-tiff/ (own content); the index page and
+/jpg-to-pdf/ link to them. Fixtures: `scripts/make-pdf-fixtures.mjs` (hand-written 2-page PDF with a non-embedded Helvetica and a
+`/Rotate 90` page; junk PDF) and `locked.pdf` (MuPDF `mutool clean -E aes-128`). Field check script: `scripts/real-pdfs.mjs`
+(our PNG vs poppler's `pdftoppm` at the same dpi).
 **/guides/ index (session 8, subagent):** one card per guide plus converters grouped by source format; footer shows 3 guides + "All guides →";
 "Guides" in the header nav. **Store screenshot 2** (`docs/store/screenshot-2-1280x800.png`, the real save-all popup with stubbed data,
 made by `scripts/store-assets.mjs`) is listed in `store/chrome-privacy.md` and `STORE.md` for the operator to upload.
@@ -359,6 +371,10 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    impressions, add more sizes (200 KB, 10 KB) and a "passport photo size" style crop tool only with a sourced size table; offer Resize and
    Max file size in the extension's save-all popup (forms are where 20–100 KB limits come from); a before/after zoom preview so users can
    judge quality; PNG target size could try 128/64 colours before shrinking.
+4a3. PDF input follow-ups (session 11): watch GSC for /pdf-to-jpg/, /pdf-to-png/, /pdf-to-tiff/ from December ("pdf to jpg" is one of the
+   largest converter queries, but the field is dominated by big upload-based sites; demand volume was not fetched this session); then
+   /pdf-to-webp/ and a "PDF to image" page; a page-range field for long PDFs; CCITT G4 TIFF output would make /pdf-to-tiff/ fit fax systems;
+   check pdf.js on scanned PDFs with JBIG2/JPEG 2000 images (only text, vector and DCT-image PDFs were tried).
 4b. Real-photo coverage: try an HDR iPhone photo (gain map) and a 48 MP HEIC (memory/time), e.g. from libheif's or Apple's public samples.
 5. Edge Add-ons: needs a free Partner Center account (operator, already requested by request-headers).
 6. Save-all hardening: stream ZIP entries instead of holding every blob (large galleries), a cap/warning above ~200 images,
