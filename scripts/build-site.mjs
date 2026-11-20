@@ -60,7 +60,7 @@ const ICON_UPLOAD = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" str
 const ICON_LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
 function toolHtml(page) {
-  const opts = Object.entries({ png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)', gif: 'GIF' })
+  const opts = Object.entries({ png: 'PNG', jpg: 'JPG', webp: 'WebP', avif: 'AVIF', pdf: 'PDF', ico: 'ICO (icon)', gif: 'GIF', tiff: 'TIFF' })
     .map(([id, label]) => `<option value="${id}"${id === page.to ? ' selected' : ''}>${label}</option>`).join('');
   const fromLabel = page.from === 'any' ? 'images' : `${FORMAT_LABEL[page.from]} files`;
   const pageSizes = Object.entries({ a4: 'A4', letter: 'US Letter', fit: 'Same as image' })
@@ -85,6 +85,7 @@ function toolHtml(page) {
       <label class="control" id="quality-control" for="quality"><span>Quality</span><input type="range" id="quality" min="10" max="100" step="1" value="90"><output id="quality-out" for="quality">90%</output></label>
       <label class="control" id="bg-control" for="bg"><span>Background</span><input type="color" id="bg" value="#ffffff"></label>
       <label class="control" id="page-size-control" for="page-size"><span>Page size</span><select id="page-size">${pageSizes}</select></label>
+      <label class="control" id="tiff-control" for="tiff-compression"><span>Compression</span><select id="tiff-compression"><option value="lzw" selected>LZW (smaller)</option><option value="none">None (uncompressed)</option></select></label>
       <fieldset class="control" id="ico-control"><legend>Icon sizes (px)</legend>${icoSizes}</fieldset>${keepJpeg}${dither}${svg}
     </div>
     <p class="note" id="format-note" role="status" hidden></p>
@@ -92,6 +93,7 @@ function toolHtml(page) {
     <div class="results-bar" id="results-bar" hidden>
       <p id="status" role="status" aria-live="polite"></p>
       <button type="button" class="btn" id="download-pdf" hidden disabled>Download one PDF</button>
+      <button type="button" class="btn" id="download-tiff" hidden disabled>Download one TIFF</button>
       <button type="button" class="btn" id="download-all" disabled>Download all (ZIP)</button>
       <button type="button" class="btn secondary" id="clear">Clear</button>
     </div>
@@ -108,10 +110,13 @@ function stepsHtml(page) {
     png: 'PNG is lossless, so there is nothing to tune. You can still pick another output format.',
     pdf: 'Pick a page size (A4, US Letter, or the size of the image) and the quality; 100% stores the pixels losslessly. Use the arrows to put the pages in order.',
     ico: 'Tick the icon sizes to include. 16, 32 and 48 px cover browser tabs and Windows; 256 px is for high-resolution displays.',
+    tiff: 'TIFF is lossless. LZW compression makes smaller files that image editors, print shops and scanning software read; choose None only for very old software. Use the arrows to set the page order for a multi-page TIFF.',
     gif: 'Leave Dither ticked for photos and gradients. Untick it for flat graphics, screenshots and pixel art: edges stay clean and the file gets smaller.',
   }[page.to];
   const lastStep = page.to === 'pdf'
     ? '<li><strong>Download</strong>Click Download one PDF to get every image as a page of a single file, or save each page as its own PDF.</li>'
+    : page.to === 'tiff'
+    ? '<li><strong>Download</strong>Save each TIFF with its Download button or all of them as a ZIP, or click Download one TIFF to get every image as a page of a single multi-page TIFF.</li>'
     : `<li><strong>Download</strong>Save each ${esc(to)} with its Download button, or all of them at once with Download all (ZIP).</li>`;
   return `<section class="section" aria-labelledby="how">
   <h2 id="how">${esc(page.howTitle || `How to convert ${page.from === 'any' ? 'an image' : `${FORMAT_LABEL[page.from]} to ${to}`}`)}</h2>
@@ -412,6 +417,7 @@ async function main() {
     copyFile(join(ROOT, 'extension/lib/filename.js'), join(DIST, 'lib/filename.js')),
     copyFile(join(ROOT, 'extension/lib/pdf.js'), join(DIST, 'lib/pdf.js')),
     copyFile(join(ROOT, 'extension/lib/gif.js'), join(DIST, 'lib/gif.js')),
+    copyFile(join(ROOT, 'extension/lib/tiff-write.js'), join(DIST, 'lib/tiff-write.js')),
   ]);
   // HEIC decoder (LGPL, vendored unmodified; see site/vendor/libheif/README.md).
   await mkdir(join(DIST, 'vendor/libheif'), { recursive: true });

@@ -232,4 +232,53 @@ export const guides = [
 <p>Already saved a folder full of .webp or .avif files? Drop them on <a href="${root}webp-to-jpg/">WebP to JPG</a> or <a href="${root}image-to-pdf/">Image to PDF</a>; they are converted in your browser and can be downloaded together as a ZIP.</p>
 `,
   },
+  {
+    slug: 'how-to-make-a-multi-page-tiff',
+    footer: 'Make a multi-page TIFF',
+    title: 'How to Combine Images Into One Multi-Page TIFF (and Split One) | Saveform',
+    description: 'Combine JPG, PNG, HEIC and other images into one multi-page TIFF in your browser, split a multi-page TIFF into pages, and know when a PDF is the better choice.',
+    h1: 'How to combine images into one multi-page TIFF, and split one',
+    lede: 'Some document systems, archives and scanning workflows want several pages in a single TIFF file rather than a PDF. Here is how to build one from any mix of images without uploading them, how to take one apart again, and how to do both on the command line.',
+    tool: { from: 'any', to: 'tiff' },
+    toolTitle: 'Combine or split TIFF pages here',
+    related: ['how-to-open-heic-files-on-windows', 'how-to-download-all-images-from-a-page'],
+    converters: ['jpg-to-tiff', 'png-to-tiff', 'tiff-to-pdf', 'tiff-to-png'],
+    body: (root) => `
+<h2>What a multi-page TIFF is</h2>
+<p>A TIFF file can hold several images one after another, each with its own size and settings. Scanners with a document feeder and fax software have long used this to keep a whole document in one file, and many document management, archiving and OCR (text recognition) systems still accept or expect it. Viewers vary, though: some simple ones show only the first page, so check that the software at the other end reads all of them.</p>
+
+<h2>Combine images into one TIFF</h2>
+<ol class="steps-list">
+  <li>Drop the images on the box above, or click it to choose them. JPG, PNG, WebP, AVIF, GIF, BMP, iPhone HEIC photos and other TIFFs can be mixed; each page of a multi-page TIFF arrives as its own row.</li>
+  <li>Check that <strong>Convert to</strong> is set to TIFF. Leave <strong>Compression</strong> on LZW, which is lossless and widely supported, unless the receiving software cannot read compressed TIFFs; then choose None.</li>
+  <li>Put the rows in order with the <strong>↑</strong> and <strong>↓</strong> buttons and remove any you do not want with <strong>×</strong>. The order of the list is the order of the pages.</li>
+  <li>Click <strong>Download one TIFF</strong>. Every converted row becomes one page of a single file.</li>
+</ol>
+<p>Each page is stored losslessly and keeps its own size. The page picks the smallest suitable layout for each image: 1-bit for pure black-and-white pages such as text scans, 8-bit greyscale for grey ones, RGB for colour, and RGB with an alpha channel when there is transparency. Every page is marked as 72 dpi, and metadata such as camera details and GPS location is not copied. The file is assembled inside your browser tab; nothing is uploaded.</p>
+
+<h2>Split a multi-page TIFF into separate files</h2>
+<p>Drop the TIFF on the same box. Each page appears as its own row, labelled with its page number, up to 500 pages per file. Choose the format you want for the pages: PNG keeps every pixel and opens almost anywhere, JPG makes small files for email, and TIFF gives one single-page TIFF per page. Then click <strong>Download all (ZIP)</strong>, or download single pages from their rows. Files are named after the original with <code>-page-1</code>, <code>-page-2</code> and so on.</p>
+<p>The same steps reorder or thin out a multi-page TIFF: drop it in, move or remove rows, and click Download one TIFF to get a new file. Be aware that the pages are decoded and written again, not copied. Pixels are kept for ordinary 8-bit images, but 16-bit pages become 8-bit, CMYK pages become RGB, and fax pages compressed with CCITT Group 4 are stored with LZW instead, which usually makes them larger.</p>
+
+<h2>Multi-page TIFF or PDF?</h2>
+<ul>
+  <li><strong>PDF</strong> when people will open the file. Every browser and phone shows it, and it prints at a proper page size. <a href="${root}image-to-pdf/">Image to PDF</a> builds one from the same kinds of images.</li>
+  <li><strong>TIFF</strong> when a system asks for it: document management, archiving, some OCR and mapping tools, and older desktop software. It holds nothing but images, stored losslessly.</li>
+  <li><strong>Fax</strong> is a special case. Fax services and software usually need black-and-white pages with CCITT compression at fax resolutions, which this page does not write. Use your fax program’s own export, or send a PDF if the service accepts one.</li>
+</ul>
+
+<h2>On the command line</h2>
+<p>If you already use ImageMagick (version 7; older versions call the command <code>convert</code>), it combines any images it can read:</p>
+<ul>
+  <li>Combine: <code>magick page1.png page2.jpg -compress lzw combined.tif</code></li>
+  <li>Split into PNGs: <code>magick combined.tif page-%d.png</code>, which numbers the pages from 0.</li>
+</ul>
+<p>The libtiff tools work on TIFF files only, but keep each page’s own bit depth and colour layout instead of converting it:</p>
+<ul>
+  <li>Combine: <code>tiffcp -c lzw a.tif b.tif combined.tif</code>, the last name being the output.</li>
+  <li>Split: <code>tiffsplit combined.tif page-</code>, which writes <code>page-aaa.tif</code>, <code>page-aab.tif</code> and so on.</li>
+</ul>
+<p>Both run on your own computer, so like this page they never upload anything. For a one-off job, the box at the top of this page is usually quicker than installing them.</p>
+`,
+  },
 ];

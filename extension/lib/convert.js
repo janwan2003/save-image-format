@@ -3,6 +3,7 @@
 // No network access happens here: it takes bytes in and gives bytes out.
 import { makePdf, pageFromCanvas } from './pdf.js';
 import { encodeGif } from './gif.js';
+import { makeTiff, tiffPage } from './tiff-write.js';
 
 export const FORMATS = {
   png: { id: 'png', mime: 'image/png', ext: 'png', label: 'PNG', lossy: false, opaque: false },
@@ -15,6 +16,8 @@ export const FORMATS = {
   // Written entirely by Saveform (lib/gif.js) from the canvas pixels, so every browser can make it.
   // Not "lossy" in the quality-slider sense: the loss is the 256-colour palette, set by `dither`.
   gif: { id: 'gif', mime: 'image/gif', ext: 'gif', label: 'GIF', lossy: false, opaque: false, ownEncoder: true },
+  // Lossless, written by lib/tiff-write.js (LZW or uncompressed; 1-bit, grey, RGB or RGBA as the pixels need).
+  tiff: { id: 'tiff', mime: 'image/tiff', ext: 'tif', label: 'TIFF', lossy: false, opaque: false, ownEncoder: true },
 };
 
 /** Icon sizes written into an ICO file (each as an embedded PNG). */
@@ -121,11 +124,12 @@ export async function decode(blob, { svgMinSize = 0, fallbackDecoders = null, pr
 }
 
 /**
- * Convert a Blob to the target format id ('png' | 'jpg' | 'webp' | 'avif' | 'pdf' | 'ico' | 'gif').
+ * Convert a Blob to the target format id ('png' | 'jpg' | 'webp' | 'avif' | 'pdf' | 'ico' | 'gif' | 'tiff').
  * options: quality (0..1, lossy formats; PDF at 1 = lossless), background (CSS color for
  * JPG/PDF), svgMinSize, pageSize ('fit' | 'a4' | 'letter', PDF), icoSizes (ICO),
- * dither (GIF, default true: Floyd–Steinberg when the image has more than 256 colours).
- * Returns { blob, width, height, sourceKind } and, for PDF, pdfPage (to combine pages later).
+ * dither (GIF, default true: Floyd–Steinberg when the image has more than 256 colours),
+ * tiffCompression ('lzw' default | 'none'), preview (PDF/TIFF: also return a small PNG `preview`).
+ * Returns { blob, width, height, sourceKind } and, for PDF, pdfPage / for TIFF, tiffPage (to combine pages later).
  */
 const WEBP_MAX = 16383;
 
@@ -150,11 +154,18 @@ export async function convertBlob(input, formatId, options = {}) {
     if (formatId === 'pdf') {
       const pdfPage = await pageFromCanvas(canvas, ctx, quality, canvasToBlob);
       const blob = makePdf([pdfPage], { pageSize: options.pageSize });
-      return { blob, width: img.width, height: img.height, sourceKind: img.kind, pdfPage };
+      const preview = options.preview ? await previewOf(canvas) : undefined;
+      return { blob, width: img.width, height: img.height, sourceKind: img.kind, pdfPage, preview };
     }
     if (formatId === 'ico') {
       const blob = await makeIco(img, options.icoSizes || ICO_SIZES);
       return { blob, width: img.width, height: img.height, sourceKind: img.kind };
+    }
+    if (formatId === 'tiff') {
+      const { data } = ctx.getImageData(0, 0, img.width, img.height);
+      const page = tiffPage(data, img.width, img.height, { compression: options.tiffCompression });
+      const preview = options.preview ? await previewOf(canvas) : undefined;
+      return { blob: makeTiff([page]), width: img.width, height: img.height, sourceKind: img.kind, tiffPage: page, preview };
     }
     if (formatId === 'gif') {
       const { data } = ctx.getImageData(0, 0, img.width, img.height);
@@ -171,6 +182,16 @@ export async function convertBlob(input, formatId, options = {}) {
   } finally {
     img.close();
   }
+}
+
+/** A small PNG of the result, for formats an <img> cannot show (PDF, TIFF). */
+async function previewOf(canvas, max = 128) {
+  const s = Math.min(1, max / Math.max(canvas.width, canvas.height));
+  const c = makeCanvas(Math.max(1, Math.round(canvas.width * s)), Math.max(1, Math.round(canvas.height * s)));
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(canvas, 0, 0, c.width, c.height);
+  return (await canvasToBlob(c, 'image/png')) || undefined;
 }
 
 /**

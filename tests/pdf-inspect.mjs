@@ -38,6 +38,8 @@ export function inspectPdf(buf) {
       width: Number(/\/Width (\d+)/.exec(dict)[1]),
       height: Number(/\/Height (\d+)/.exec(dict)[1]),
       filter: /\/Filter \/(\w+)/.exec(dict)[1],
+      colorSpace: /\/ColorSpace \/(\w+)/.exec(dict)[1],
+      bpc: Number(/\/BitsPerComponent (\d+)/.exec(dict)[1]),
       data,
       pixels: () => inflateSync(data), // FlateDecode pages only
     };

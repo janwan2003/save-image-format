@@ -1,6 +1,7 @@
 // Minimal PDF writer for Saveform: one image per page, no dependencies.
-// Pages carry either JPEG bytes (DCTDecode) or zlib-compressed RGB pixels
-// (FlateDecode, lossless). Output is plain PDF 1.4 that every viewer opens.
+// Pages carry either JPEG bytes (DCTDecode) or zlib-compressed pixels (FlateDecode, lossless:
+// RGB, 8-bit grey, or 1-bit black and white). Output is plain PDF 1.4 that every viewer opens.
+import { analyse } from './tiff-write.js';
 
 const enc = new TextEncoder();
 
@@ -15,28 +16,48 @@ const PX_TO_PT = 0.75; // CSS pixels are 1/96 inch, PDF points are 1/72 inch.
 
 /**
  * Turn pixels on a canvas into a PDF page image.
- * quality < 1 -> JPEG at that quality; quality >= 1 -> lossless (Flate-compressed RGB).
- * Returns { width, height, filter, data: Uint8Array }.
+ * Pure black-and-white pages (scans, faxes) are always stored losslessly as 1 bit per pixel:
+ * smaller than any JPEG and exact. Otherwise quality < 1 -> JPEG at that quality;
+ * quality >= 1 -> lossless Flate (8-bit grey when the image is grey, else RGB).
+ * Returns { width, height, filter, data: Uint8Array, colorSpace, bpc }.
  */
 export async function pageFromCanvas(canvas, ctx, quality, toBlob) {
   const width = canvas.width, height = canvas.height;
+  const canFlate = typeof CompressionStream !== 'undefined';
+  const rgba = canFlate ? ctx.getImageData(0, 0, width, height).data : null;
+  const kind = rgba ? analyse(rgba) : {};
+  if (kind.bilevel) {
+    const rowBytes = Math.ceil(width / 8);
+    const bits = new Uint8Array(rowBytes * height);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) if (rgba[(y * width + x) * 4]) bits[y * rowBytes + (x >> 3)] |= 0x80 >> (x & 7);
+    }
+    return { width, height, filter: 'FlateDecode', data: await deflate(bits), colorSpace: 'DeviceGray', bpc: 1 };
+  }
   if (quality < 1) {
     const jpeg = await toBlob(canvas, 'image/jpeg', quality);
     if (!jpeg || jpeg.type !== 'image/jpeg') throw new Error('The browser could not encode the image');
     return { width, height, filter: 'DCTDecode', data: new Uint8Array(await jpeg.arrayBuffer()) };
   }
-  if (typeof CompressionStream === 'undefined') {
+  if (!canFlate) {
     // Very old browsers: fall back to near-lossless JPEG rather than an uncompressed page.
     return pageFromCanvas(canvas, ctx, 0.98, toBlob);
   }
-  const rgba = ctx.getImageData(0, 0, width, height).data;
+  if (kind.grey) {
+    const grey = new Uint8Array(width * height);
+    for (let i = 0, j = 0; j < grey.length; i += 4, j++) grey[j] = rgba[i];
+    return { width, height, filter: 'FlateDecode', data: await deflate(grey), colorSpace: 'DeviceGray', bpc: 8 };
+  }
   const rgb = new Uint8Array(width * height * 3);
   for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
     rgb[j] = rgba[i]; rgb[j + 1] = rgba[i + 1]; rgb[j + 2] = rgba[i + 2];
   }
-  const stream = new Blob([rgb]).stream().pipeThrough(new CompressionStream('deflate'));
-  const data = new Uint8Array(await new Response(stream).arrayBuffer());
-  return { width, height, filter: 'FlateDecode', data };
+  return { width, height, filter: 'FlateDecode', data: await deflate(rgb), colorSpace: 'DeviceRGB', bpc: 8 };
+}
+
+async function deflate(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
 const num = (x) => {
@@ -96,7 +117,7 @@ export function makePdf(pages, { pageSize = 'fit', margin = 36 } = {}) {
       + `/Resources << /XObject << /Im0 ${n + 2} 0 R >> >> /Contents ${n + 1} 0 R >>`);
     obj(n + 1, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
     obj(n + 2, `<< /Type /XObject /Subtype /Image /Width ${p.width} /Height ${p.height} `
-      + `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /${p.filter} /Length ${p.data.length} >>\nstream\n`,
+      + `/ColorSpace /${p.colorSpace || 'DeviceRGB'} /BitsPerComponent ${p.bpc || 8} /Filter /${p.filter} /Length ${p.data.length} >>\nstream\n`,
     p.data, '\nendstream');
   });
   obj(infoObj, '<< /Producer (Saveform) /Creator (Saveform image converter) >>');

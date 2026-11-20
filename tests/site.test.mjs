@@ -15,6 +15,7 @@ import { chromium } from 'playwright-core';
 import { converters } from '../site/pages.mjs';
 import { guides } from '../site/guides.mjs';
 import { inspectPdf, inspectIco, popplerAvailable, renderFirstPage } from './pdf-inspect.mjs';
+import '../site/assets/tiff.js'; // our TIFF decoder (globalThis.SaveformTiff), to read back TIFF output
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
@@ -627,7 +628,7 @@ test('guide pages with an embedded converter convert a pasted image', async () =
     });
     await waitForDone(page, 1);
     assert.match(await page.locator('#results .result-meta').textContent(), /12 × 8 px/);
-    assert.match(await page.locator('#results a.btn').getAttribute('download'), new RegExp(`\\.${g.tool.to}$`));
+    assert.match(await page.locator('#results a.btn').getAttribute('download'), new RegExp(`\\.${{ tiff: 'tif' }[g.tool.to] || g.tool.to}$`));
     await page.close();
   }
 });
@@ -1094,7 +1095,17 @@ test('tiff-to-pdf splits a multi-page TIFF into rows and combines them with a fa
   const pages = inspectPdf(bytes);
   assert.equal(pages.length, 4);
   assert.deepEqual(jpegSize(pages[0].data), { width: 40, height: 30 });
-  assert.deepEqual(jpegSize(pages[3].data), { width: 96, height: 64 });
+  // The fax page is pure black and white: stored losslessly at 1 bit per pixel, not as JPEG.
+  assert.deepEqual([pages[3].filter, pages[3].colorSpace, pages[3].bpc, pages[3].width, pages[3].height], ['FlateDecode', 'DeviceGray', 1, 96, 64]);
+  const bits = pages[3].pixels();
+  const want = gunzipSync(await readFile(join(TIFF_DIR, tiffManifest['bilevel-g3'].expected)));
+  let wrong = 0;
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 96; x++) {
+    const white = (bits[y * 12 + (x >> 3)] >> (7 - (x & 7))) & 1;
+    if (white * 255 !== want[(y * 96 + x) * 4]) wrong++;
+  }
+  assert.equal(wrong, 0, 'fax page pixels exact');
+  assert.ok(pages[3].data.length < 2000, `fax page is small (${pages[3].data.length} bytes)`);
   // Pages keep their own colours: decode each page's JPEG and read its centre.
   const centres = await page.evaluate(async (jpegs) => Promise.all(jpegs.map(async (b) => {
     const bmp = await createImageBitmap(new Blob([new Uint8Array(b)], { type: 'image/jpeg' }));
@@ -1222,4 +1233,80 @@ test('built output: robots, sitemap, shared engine copied, no external URLs in a
 test('no console errors and no requests to non-localhost hosts across all tests', () => {
   assert.deepEqual(consoleErrors, []);
   assert.deepEqual(externalRequests, []);
+});
+
+// ---- TIFF output ---------------------------------------------------------------------------
+async function tiffPixels(bytes, page = 0) {
+  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length);
+  return globalThis.SaveformTiff.decode(buf, page);
+}
+
+test('TIFF output: PNG with alpha and a JPG become exact TIFFs; Download one TIFF joins them in list order', async () => {
+  const { page } = await openPage('/');
+  await page.selectOption('#format', 'tiff');
+  assert.equal(await page.locator('#tiff-control').isVisible(), true);
+  assert.equal(await page.locator('#quality-control').isVisible(), false, 'TIFF is lossless: no quality slider');
+  const png = await makeFixture(page, 'image/png', 40, 20);
+  const jpg = await makePhotoJpeg(page, 64, 48);
+  await page.setInputFiles('#file', [
+    { name: 'logo.png', mimeType: 'image/png', buffer: png },
+    { name: 'photo.jpg', mimeType: 'image/jpeg', buffer: jpg },
+  ]);
+  await waitForDone(page, 2);
+  assert.deepEqual(await page.locator('#results .result-name').allTextContents(), ['logo.tif', 'photo.tif']);
+  assert.equal(await page.locator('#download-tiff').isVisible(), true);
+  assert.equal(await page.locator('#download-pdf').isVisible(), false);
+  assert.equal(await page.locator('#results .thumb[src]').count(), 2, 'TIFF rows show a preview');
+  const one = await downloadBytes(page, '#results li:first-child a.btn');
+  assert.equal(one.name, 'logo.tif');
+  const logo = await tiffPixels(one.bytes);
+  assert.deepEqual([logo.width, logo.height], [40, 20]);
+  assert.deepEqual([...logo.data.subarray(0, 4)], [0, 0, 0, 0], 'transparent pixel kept');
+  assert.deepEqual([...logo.data.subarray(39 * 4, 40 * 4)], [0x1e, 0x88, 0xe5, 255], 'opaque pixel exact');
+  // Reorder: photo first, then Download one TIFF.
+  await page.click('#results li:nth-child(2) .move');
+  assert.match(await page.locator('#download-tiff').textContent(), /2 pages/);
+  const multi = await downloadBytes(page, '#download-tiff');
+  assert.equal(multi.name, 'photo-and-1-more.tif');
+  const buf = multi.bytes.buffer.slice(multi.bytes.byteOffset, multi.bytes.byteOffset + multi.bytes.length);
+  assert.equal(globalThis.SaveformTiff.pages(buf), 2);
+  const p1 = await tiffPixels(multi.bytes, 0), p2 = await tiffPixels(multi.bytes, 1);
+  assert.deepEqual([p1.width, p1.height, p2.width, p2.height], [64, 48, 40, 20]);
+  // The photo page holds exactly the pixels the browser decodes from the JPEG.
+  const decoded = await page.evaluate(async (b) => {
+    const bmp = await createImageBitmap(new Blob([new Uint8Array(b)], { type: 'image/jpeg' }));
+    const c = new OffscreenCanvas(bmp.width, bmp.height); const g = c.getContext('2d'); g.drawImage(bmp, 0, 0);
+    return [...g.getImageData(0, 0, bmp.width, bmp.height).data];
+  }, [...jpg]);
+  assert.ok(Buffer.from(p1.data).equals(Buffer.from(decoded)), 'JPG → TIFF is lossless after decoding');
+  await page.close();
+});
+
+test('TIFF output: a fax TIFF stays 1-bit, a multi-page TIFF round-trips, Compression None writes uncompressed strips', async () => {
+  const { page } = await openPage('/');
+  await page.selectOption('#format', 'tiff');
+  await page.setInputFiles('#file', [join(TIFF_DIR, 'bilevel-g4.tif'), join(TIFF_DIR, 'multipage.tif')]);
+  await waitForDone(page, 4);
+  const fax = await downloadBytes(page, '#results li:first-child a.btn');
+  const faxPx = await tiffPixels(fax.bytes);
+  const want = gunzipSync(await readFile(join(TIFF_DIR, tiffManifest['bilevel-g4'].expected)));
+  assert.ok(Buffer.from(faxPx.data).equals(want), 'fax pixels exact');
+  const bps = fax.bytes.readUInt16LE(fax.bytes.indexOf(Buffer.from([0x02, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00])) + 8);
+  assert.equal(bps, 1, 'BitsPerSample 1');
+  const all = await downloadBytes(page, '#download-tiff');
+  const buf = all.bytes.buffer.slice(all.bytes.byteOffset, all.bytes.byteOffset + all.bytes.length);
+  assert.equal(globalThis.SaveformTiff.pages(buf), 4);
+  for (const k of [0, 1, 2]) {
+    const got = await tiffPixels(all.bytes, k + 1);
+    const exp = gunzipSync(await readFile(join(TIFF_DIR, tiffManifest[`multipage-p${k}`]?.expected || `multipage-p${k}.rgba.gz`)));
+    assert.ok(Buffer.from(got.data).equals(exp), `page ${k + 2} exact`);
+  }
+  await page.selectOption('#tiff-compression', 'none');
+  await waitForDone(page, 4);
+  const raw = await downloadBytes(page, '#results li:nth-child(2) a.btn');
+  // Compression tag (259) = 1 and the file is at least width × height × 3 bytes.
+  const comp = raw.bytes.indexOf(Buffer.from([0x03, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00]));
+  assert.equal(raw.bytes.readUInt16LE(comp + 8), 1);
+  assert.ok(raw.bytes.length >= 40 * 30 * 3);
+  await page.close();
 });

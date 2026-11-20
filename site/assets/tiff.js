@@ -91,7 +91,17 @@
     }
     if (!ifds.length) throw fail('This TIFF file has no images');
     // Reduced-resolution copies (thumbnails, NewSubfileType bit 0) are not pages.
-    const full = ifds.filter((t) => !((t.get(254)?.[0] ?? 0) & 1) && t.has(256));
+    // Some cameras store an unmarked thumbnail right after the image (e.g. a 160×120 copy of a
+    // 640×480 photo, with no NewSubfileType tag at all): such an IFD, at most a third of the previous
+    // page's size and the same shape, is treated as a thumbnail too.
+    const dims = (t) => [t.get(256)?.[0] || 0, t.get(257)?.[0] || 0];
+    const isThumbOf = (t, prev) => {
+      if (t.has(254)) return false; // marked as a page (our own writer and most scanners write 0)
+      const [w, h] = dims(t), [pw, ph] = dims(prev);
+      return w > 0 && h > 0 && Math.max(w, h) <= 512 && w * 3 <= pw && h * 3 <= ph && Math.abs(w / h - pw / ph) <= 0.03 * (pw / ph);
+    };
+    const marked = ifds.filter((t) => !((t.get(254)?.[0] ?? 0) & 1) && t.has(256));
+    const full = marked.filter((t, i) => i === 0 || !isThumbOf(t, marked[i - 1]));
     return { bytes, le, pages: full.length ? full : ifds.filter((t) => t.has(256)) };
   }
 

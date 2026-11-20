@@ -3,6 +3,7 @@
 // a network request: files are read, converted and offered for download locally.
 import { FORMATS, canEncode, convertBlob, decode, sniffType } from '../lib/convert.js';
 import { makePdf } from '../lib/pdf.js';
+import { makeTiff } from '../lib/tiff-write.js';
 import { baseNameFromUrl } from '../lib/filename.js';
 import { makeZip } from '../lib/zip.js';
 import { decodeHeic } from './heic.js';
@@ -36,6 +37,9 @@ function init(root) {
   const dither = $('#dither');
   const ditherCtl = $('#dither-control');
   const downloadPdf = $('#download-pdf');
+  const downloadTiff = $('#download-tiff');
+  const tiffCompression = $('#tiff-compression');
+  const tiffCtl = $('#tiff-control');
   const formatNote = $('#format-note');
   const bar = $('#results-bar');
   const status = $('#status');
@@ -59,6 +63,7 @@ function init(root) {
     icoSizes: icoBoxes.filter((b) => b.checked).map((b) => Number(b.value)),
     keepJpeg: !!keepJpeg?.checked && formatSel.value === 'jpg',
     dither: dither ? dither.checked : true,
+    tiffCompression: tiffCompression?.value || 'lzw',
   });
 
   function syncControls() {
@@ -71,6 +76,8 @@ function init(root) {
     icoCtl.hidden = fmt.id !== 'ico';
     if (ditherCtl) ditherCtl.hidden = fmt.id !== 'gif';
     downloadPdf.hidden = fmt.id !== 'pdf';
+    if (tiffCtl) tiffCtl.hidden = fmt.id !== 'tiff';
+    if (downloadTiff) downloadTiff.hidden = fmt.id !== 'tiff';
     root.dataset.format = fmt.id;
     showQuality();
   }
@@ -118,6 +125,7 @@ function init(root) {
   icoBoxes.forEach((b) => b.addEventListener('change', () => settingsChanged(300)));
   keepJpeg?.addEventListener('change', () => settingsChanged());
   dither?.addEventListener('change', () => settingsChanged());
+  tiffCompression?.addEventListener('change', () => settingsChanged());
   bg.addEventListener('input', () => settingsChanged(300));
   svgSize?.addEventListener('change', () => settingsChanged());
 
@@ -204,7 +212,7 @@ function init(root) {
       updateBar();
       try {
         const decoders = item.page != null ? { ...FALLBACK_DECODERS, tiff: (b) => decodeTiff(b, item.page) } : FALLBACK_DECODERS;
-        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, { ...opts, fallbackDecoders: decoders, preferFallback: item.page != null });
+        const r = opts.keepJpeg ? await keepJpegBytes(item.file) : await convertBlob(item.file, opts.format, { ...opts, preview: true, fallbackDecoders: decoders, preferFallback: item.page != null });
         if (item.removed) continue;
         revoke(item);
         item.result = { ...r, format: opts.format, url: URL.createObjectURL(r.blob), name: outputName(item.outName || item.file.name, opts.format) };
@@ -269,7 +277,7 @@ function init(root) {
     return { li, thumb, name, meta, dl };
   }
 
-  // Page order for "Download one PDF" is the list order.
+  // Page order for "Download one PDF" / "Download one TIFF" is the list order.
   function move(item, delta) {
     const i = items.indexOf(item), j = i + delta;
     if (i < 0 || j < 0 || j >= items.length) return;
@@ -285,9 +293,10 @@ function init(root) {
     name.textContent = r ? r.name : item.label;
     name.title = item.label;
     if (item.state === 'done' && r) {
-      // A PDF cannot be shown in an <img>, so its row previews the page's JPEG data, or else the
-      // source file (not for HEIC/TIFF, which most browsers cannot show).
-      if (r.format !== 'pdf') thumb.src = r.url;
+      // A PDF or TIFF cannot be shown in an <img> (TIFF only in Safari), so its row previews the
+      // page's JPEG data, or else the source file (not for HEIC/TIFF, which most browsers cannot show).
+      if (r.format !== 'pdf' && r.format !== 'tiff') thumb.src = r.url;
+      else if (r.preview) thumb.src = (item.pdfThumb ||= URL.createObjectURL(r.preview));
       else if (r.pdfPage?.filter === 'DCTDecode') thumb.src = (item.pdfThumb ||= URL.createObjectURL(new Blob([r.pdfPage.data], { type: 'image/jpeg' })));
       else if (r.sourceKind === 'heic' || r.sourceKind === 'tiff') thumb.removeAttribute('src');
       else thumb.src = (item.preview ||= URL.createObjectURL(item.file));
@@ -322,6 +331,10 @@ function init(root) {
     downloadAll.disabled = done === 0 || busy > 0;
     downloadPdf.disabled = done === 0 || busy > 0;
     downloadPdf.textContent = done > 1 ? `Download one PDF (${done} pages)` : 'Download one PDF';
+    if (downloadTiff) {
+      downloadTiff.disabled = done === 0 || busy > 0;
+      downloadTiff.textContent = done > 1 ? `Download one TIFF (${done} pages)` : 'Download one TIFF';
+    }
     let text = `${done} of ${items.length} image${items.length === 1 ? '' : 's'} converted`;
     if (failed) text += `, ${failed} failed`;
     if (busy) text += ' (working…)';
@@ -350,6 +363,15 @@ function init(root) {
     const pdf = makePdf(pages.map((i) => i.result.pdfPage), { pageSize: settings().pageSize });
     const name = pages.length === 1 ? pages[0].result.name : `${pages[0].result.name.replace(/\.pdf$/, '')}-and-${pages.length - 1}-more.pdf`;
     saveFile(pdf, name);
+  });
+
+  // Multi-page TIFF: the pages already encoded for each row, joined in list order.
+  downloadTiff?.addEventListener('click', () => {
+    const pages = items.filter((i) => i.state === 'done' && i.result?.tiffPage);
+    if (!pages.length) return;
+    const tiff = makeTiff(pages.map((i) => i.result.tiffPage));
+    const name = pages.length === 1 ? pages[0].result.name : `${pages[0].result.name.replace(/\.tif$/, '')}-and-${pages.length - 1}-more.tif`;
+    saveFile(tiff, name);
   });
 
   clearBtn.addEventListener('click', () => {
