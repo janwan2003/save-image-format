@@ -36,7 +36,7 @@ https://janwan2003.github.io/save-image-format/
 2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick the
    `extension` folder.
 
-Firefox (128+): `about:debugging` → This Firefox → Load Temporary Add-on → `extension/manifest.json`.
+Firefox (142+): `about:debugging` → This Firefox → Load Temporary Add-on → `extension/manifest.json`.
 (Firefox support is written but not yet tested; see the issue tracker.)
 
 ## Develop

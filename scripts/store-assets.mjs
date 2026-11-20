@@ -40,5 +40,9 @@ for (const [name, html, w, h] of [['screenshot-1280x800.png', shot, 1280, 800], 
   await page.setContent(html);
   await page.screenshot({ path: path.join(out, name) });
 }
+// Social preview for the website (og:image), 1200x630: the screenshot scene, cropped.
+await page.setViewportSize({ width: 1200, height: 630 });
+await page.setContent(`<div style="transform:scale(0.9375);transform-origin:0 0;margin-top:-30px">${shot}</div>`);
+await page.screenshot({ path: path.join(root, 'site/og-image.png') });
 await browser.close();
 console.log('written to', out);

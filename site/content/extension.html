@@ -1,0 +1,48 @@
+<section class="hero hero-ext">
+<h1>Saveform for Chrome: save any web image as PNG, JPG or WebP</h1>
+<p class="lede">Right-click an image, pick a format, and it is saved in that format. The conversion happens on your computer, with the same code that powers the <a href="{{root}}">converter on this site</a>.</p>
+<p class="badge-line"><span class="badge">Chrome Web Store listing coming soon</span></p>
+</section>
+
+<section class="prose">
+<h2>What it does</h2>
+<ul>
+  <li>Adds a <strong>Saveform</strong> entry to the right-click menu on images, with <em>Save as PNG</em>, <em>Save as JPG</em> and <em>Save as WebP</em> (and AVIF where the browser can create it).</li>
+  <li>Converts the image locally and saves it through Chrome’s normal downloads, with a sensible file name.</li>
+  <li>Works with the formats sites like to serve but many apps refuse, such as WebP and AVIF.</li>
+  <li>Collects nothing. No analytics, no accounts, no remote code. Read the <a href="{{root}}privacy/">privacy policy</a>.</li>
+</ul>
+
+<h2>Permissions, in plain words</h2>
+<dl class="perms">
+  <dt><code>contextMenus</code></dt>
+  <dd>Adds the Saveform entries to the menu you see when you right-click an image.</dd>
+  <dt><code>downloads</code></dt>
+  <dd>Saves the converted file through Chrome’s own download system, so it lands in your usual Downloads folder and shows up in your download list.</dd>
+  <dt><code>activeTab</code></dt>
+  <dd>Gives the extension temporary access to the tab you right-clicked in, only at the moment you choose a Saveform entry, so it can read that image.</dd>
+  <dt><code>scripting</code></dt>
+  <dd>Together with the temporary tab access above, lets the extension run its own small piece of code in that tab to read the image when it can only be read from inside the page, to copy the result to your clipboard, and to show a short status notice.</dd>
+  <dt><code>storage</code></dt>
+  <dd>Remembers your settings, such as JPG quality, on your device.</dd>
+  <dt><code>offscreen</code></dt>
+  <dd>Opens a hidden extension page used for image decoding that background code cannot do on its own (SVG, for example). It is not a visible window and cannot see your tabs.</dd>
+  <dt>Optional: access to a specific site</dt>
+  <dd>Some image servers refuse to let other sites read their images. Only then does Saveform ask for access to that one site. You can say no, and you can remove the access any time in Saveform’s settings or on <code>chrome://extensions</code>.</dd>
+</dl>
+<p>Saveform does not ask for access to all websites up front (the per-site prompt offers it, and you can decline), and it does not read your browsing history.</p>
+
+<h2>Install it now from the source code</h2>
+<p>Until the Chrome Web Store listing is live, you can load the extension directly from its open source code:</p>
+<ol class="steps-list">
+  <li>Download the repository: on <a href="{{repo}}">the GitHub page</a> choose <strong>Code → Download ZIP</strong> and unzip it (or clone it with git).</li>
+  <li>Open <code>chrome://extensions</code> in Chrome (type it into the address bar).</li>
+  <li>Turn on <strong>Developer mode</strong> with the switch in the top-right corner.</li>
+  <li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder inside the downloaded repository.</li>
+  <li>Right-click any image on the web and look for the Saveform entry.</li>
+</ol>
+<p class="muted">Extensions loaded this way do not update automatically; download the repository again to get a newer version. Edge and other Chromium-based browsers accept the same steps on their own extensions page.</p>
+
+<h2>Open source</h2>
+<p>All of the code is public at <a href="{{repo}}">github.com/janwan2003/save-image-format</a>. Bug reports and suggestions are welcome as GitHub issues.</p>
+</section>
