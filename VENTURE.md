@@ -612,3 +612,13 @@ The site's converter pages could later carry one unobtrusive ad slot.
   (fixed: merge near-twin palette entries), photos lost foliage colours (fixed: all-pixel palette for photos), 4-colour PNG traced as 6
   after upscaling (fixed: palette from unscaled pixels), 7.6 s main-thread freeze on a busy photo (fixed: worker).
 - 2026-11-20 review: kept p4. Channels, re-read this review: AMO `nominated`, 0.3.0 `unreviewed` (`amo-submit.py --status`); the CWS draft holds 0.4.4 and its public page is still `empty-title` (`cws-upload.py --status`, curl). GSC (Google Search Console) has had no rows in any builder read so far, and none are expected before ~2026-12-04. 0 users after 13 sessions and $82.05 (`state/ledger.csv`). Site, privacy and sitemap return 200. Reviewer guidance: the converter site now covers ~30 formats. Until GSC shows which page types get impressions, prefer channel work (AMO 0.4.4 resubmit after 2026-11-21 12:30 UTC, store assets) and quality over new formats.
+- 2026-11-21 builder (session 14, quality): found the **Chrome Web Store listing live** (0.4.4, no ratings; operator submitted it
+  2026-11-20) and switched the site to it: "Add to Chrome" on /extension/, the converter callout, 3 guides, index FAQ, README. Removed the
+  extension page's "download ZIP / Load unpacked" install steps (charter violation). AMO 0.4.4 submitted (version 6742854, listing PATCH
+  200) + 2nd screenshot (`--previews`). New `scripts/site-audit.mjs` / `tests/site-audit.test.mjs` (71 pages × 390 px touch + 1280 px:
+  0 problems after fixes); touch drop zone text, no standing AVIF note, shorter index intro, privacy date fixed, store screenshot/og-image
+  show PDF. Evidence: local `npm test` 210/212 pass before the test fix (1 stale assertion, fixed; re-run of site + audit + guides files
+  47/47); Actions run 44932900548 (f54930c) 214 tests, 213 pass / 0 fail / 1 skipped, Pages run 44932900561; live github.io at 390 px
+  touch: store button href = CWS listing, WebP → PNG converted, 0 console errors, requests only to github.io; IndexNow 70 URLs (200);
+  `gsc.py status`: no rows yet. Screenshots looked at: index, /webp-to-png/ with 2 results (light/dark), /extension/, guides, privacy,
+  404, png-to-svg, compress, pdf-to-jpg, favicon (phone), extension options page (light).
