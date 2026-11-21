@@ -2,6 +2,7 @@
 // `body(root)` returns trusted HTML; `root` is the relative path to the site root.
 // `tool` embeds the converter (same markup and script as the converter pages).
 // All prose here is original.
+import { CWS_URL } from './pages.mjs';
 
 export const guides = [
   {
@@ -44,7 +45,7 @@ export const guides = [
 
 <h2>Method 4: add “Save as PNG / JPG” to the right-click menu</h2>
 <p>If you save images from the web often, a browser extension removes the extra steps: right-click the picture, choose the format, and the converted file lands in your Downloads folder. When choosing one, check what it asks for. An image saver needs to read the image you clicked and write a download; it does not need to read every page you visit or send anything to a server. Our article on <a href="${root}save-image-as-type-alternative/">choosing a replacement image-saving extension</a> explains what to look for and why it matters.</p>
-<p>Saveform, made by the same people as this site, is one such extension: open source, converted locally, and it asks for access to a site only when that site’s server blocks the download. See <a href="${root}extension/">the extension page</a> for how to install it.</p>
+<p>Saveform, made by the same people as this site, is one such extension: open source, converted locally, and it asks for access to a site only when that site’s server blocks the download. It is free in the <a href="${CWS_URL}" rel="noopener">Chrome Web Store</a> (Firefox version in review); <a href="${root}extension/">the extension page</a> explains what it does and every permission it asks for.</p>
 
 <h2>PNG or JPG: which should you pick?</h2>
 <ul>
@@ -126,7 +127,7 @@ export const guides = [
 
 <h2>One option: Saveform</h2>
 <p>We built Saveform with these checks in mind, so here is how it measures up. It adds <em>Save as PNG / JPG / WebP / PDF</em> (and AVIF where the browser can create it) plus <em>Copy as PNG</em> to the right-click menu. Conversion happens on your device with the same code as this site’s converters; the only thing it downloads is the image you clicked, nothing is sent to any server of ours, there are no analytics and no account. The only install warning is “Manage your downloads”: it does not ask for access to the sites you visit, and requests access to a single image host only if that server blocks the download, which you can decline or revoke. The source code is public on <a href="https://github.com/janwan2003/save-image-format" rel="noopener">GitHub</a> under the MIT licence.</p>
-<p>It is new and does not have the history the old extension had, and its store listings are not live yet (the Firefox version is in Mozilla’s review queue, the Chrome version comes next). You can install it from source today; see <a href="${root}extension/">the extension page</a> for the steps and a plain-language explanation of every permission. Other image-saving extensions exist too; whichever you choose, the checks above apply.</p>`,
+<p>It is new and does not have the history the old extension had, It is free in the <a href="${CWS_URL}" rel="noopener">Chrome Web Store</a>, and the Firefox version is in Mozilla’s review queue. <a href="${root}extension/">The extension page</a> shows what it does and explains every permission in plain words. Other image-saving extensions exist too; whichever you choose, the checks above apply.</p>`,
   },
   {
     slug: 'how-to-open-heic-files-on-windows',
@@ -221,7 +222,7 @@ export const guides = [
   <li><strong>Save.</strong> The work continues in the background even if you close the panel. If a site does not let extensions read its images, Saveform lists those sites once and asks whether to allow them or skip those images, so a ZIP or PDF still ends up as a single file.</li>
 </ol>
 <p>Limits worth knowing: it lists up to 500 images per page, it cannot run on the browser’s own pages (settings, new tab, extension stores), and images the page has not added yet, such as the next screen of an endless feed, are not there to find. The same extension also adds <em>Save as PNG / JPG / WebP / PDF</em> to the right-click menu for single images.</p>
-<p>Saveform is new and its store listings are not live yet. In Chrome, Edge and other Chromium-based browsers you can load it from its open source code today; <a href="${root}extension/">the extension page</a> has the steps and explains every permission it asks for.</p>
+<p>Saveform is free in the <a href="${CWS_URL}" rel="noopener">Chrome Web Store</a> (it also installs in Edge and Brave); the Firefox version is in Mozilla’s review queue. <a href="${root}extension/">The extension page</a> explains every permission it asks for.</p>
 
 <h2>Which one should you use?</h2>
 <ul>

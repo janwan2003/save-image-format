@@ -1,7 +1,13 @@
 <section class="hero hero-ext">
-<h1>Saveform for Chrome: save any web image as PNG, JPG, WebP or PDF</h1>
+<h1>Saveform: save any web image as PNG, JPG, WebP or PDF</h1>
 <p class="lede">Right-click an image, pick a format, and it is saved in that format. Or click the toolbar button to save every image on the page at once. The conversion happens on your computer, with the same code that powers the <a href="{{root}}">converter on this site</a>.</p>
-<p class="badge-line"><span class="badge">Firefox: submitted to Mozilla, in review</span> <span class="badge">Chrome Web Store: coming soon</span></p>
+<p class="store-line"><a class="btn" href="{{cws}}" rel="noopener">Add to Chrome, free</a></p>
+<p class="muted store-note">From the Chrome Web Store; also installs in Edge, Brave and other Chromium browsers. The Firefox version is in Mozilla’s review queue and will be linked here when it is live.</p>
+</section>
+
+<section class="ext-shots" aria-label="Screenshots">
+<figure><img src="{{root}}assets/ext-menu.webp" width="1280" height="800" alt="Right-clicking an image shows a Save image as menu with PNG, JPG, WebP, PDF and Copy as PNG"><figcaption>Right-click any image and pick a format.</figcaption></figure>
+<figure><img src="{{root}}assets/ext-save-all.webp" width="1280" height="800" loading="lazy" alt="The toolbar panel lists every image on a page in a grid with format and output choices"><figcaption>Or save every image on a page as files, one ZIP or one PDF.</figcaption></figure>
 </section>
 
 <section class="prose">
@@ -9,7 +15,7 @@
 <ul>
   <li>Adds a <strong>Saveform</strong> entry to the right-click menu on images, with <em>Save as PNG</em>, <em>Save as JPG</em>, <em>Save as WebP</em> and <em>Save as PDF</em> (and AVIF where the browser can create it), plus <em>Copy as PNG</em>.</li>
   <li>Its toolbar button (shortcut <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) shows every image on the page in a grid. Untick what you don’t want, hide small icons, and save the rest as separate files, one ZIP or one PDF, converted to PNG, JPG or WebP or kept in their original format. It picks the largest version a page offers and finds CSS background images too.</li>
-  <li>Converts the image locally and saves it through Chrome’s normal downloads, with a sensible file name. In the settings you can build names from the site, date or image size, and pick a folder inside Downloads.</li>
+  <li>Converts the image locally and saves it through the browser’s normal downloads, with a sensible file name. In the settings you can build names from the site, date or image size, and pick a folder inside Downloads.</li>
   <li>Works with the formats sites like to serve but many apps refuse, such as WebP and AVIF.</li>
   <li>Collects nothing. No analytics, no accounts, no remote code. Read the <a href="{{root}}privacy/">privacy policy</a>.</li>
 </ul>
@@ -19,7 +25,7 @@
   <dt><code>contextMenus</code></dt>
   <dd>Adds the Saveform entries to the menu you see when you right-click an image.</dd>
   <dt><code>downloads</code></dt>
-  <dd>Saves the converted file through Chrome’s own download system, so it lands in your usual Downloads folder and shows up in your download list.</dd>
+  <dd>Saves the converted file through the browser’s own download system, so it lands in your usual Downloads folder and shows up in your download list.</dd>
   <dt><code>activeTab</code></dt>
   <dd>Gives the extension temporary access to the current tab, only when you choose a Saveform menu entry or click its toolbar button, so it can read the images you want to save.</dd>
   <dt><code>scripting</code></dt>
@@ -33,17 +39,6 @@
 </dl>
 <p>Saveform does not ask for access to all websites up front (the per-site prompt offers it, and you can decline), and it does not read your browsing history.</p>
 
-<h2>Install it now from the source code</h2>
-<p>Until the store listings are live, you can load the extension directly from its open source code:</p>
-<ol class="steps-list">
-  <li>Download the repository: on <a href="{{repo}}">the GitHub page</a> choose <strong>Code → Download ZIP</strong> and unzip it (or clone it with git).</li>
-  <li>Open <code>chrome://extensions</code> in Chrome (type it into the address bar).</li>
-  <li>Turn on <strong>Developer mode</strong> with the switch in the top-right corner.</li>
-  <li>Click <strong>Load unpacked</strong> and select the <code>extension</code> folder inside the downloaded repository.</li>
-  <li>Right-click any image on the web and look for the Saveform entry, or pin the Saveform button to the toolbar (puzzle-piece menu → pin) to save several images from a page.</li>
-</ol>
-<p class="muted">Extensions loaded this way do not update automatically; download the repository again to get a newer version. Edge and other Chromium-based browsers accept the same steps on their own extensions page.</p>
-
 <h2>Open source</h2>
-<p>All of the code is public at <a href="{{repo}}">github.com/janwan2003/save-image-format</a>. Bug reports and suggestions are welcome as GitHub issues.</p>
+<p>All of the code is public at <a href="{{repo}}">github.com/janwan2003/save-image-format</a>. Every file in the store packages can be checked against it. Bug reports and suggestions are welcome as GitHub issues.</p>
 </section>

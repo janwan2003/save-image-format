@@ -148,10 +148,11 @@ function init(root) {
         unsupported.push(fmt.label);
       }
     }
-    // The note matters on the general converter, or when this page's own format is unavailable;
-    // elsewhere the disabled option's label already says so.
+    // The note matters only when this page's own output format is unavailable; otherwise the
+    // disabled option's label already says so (every current browser lacks AVIF output, so a
+    // standing note on the general converter was noise).
     const wantedLabel = formatOf(formatSel.value).label;
-    if (unsupported.length && (root.hasAttribute('data-general') || unsupported.includes(wantedLabel))) {
+    if (unsupported.length && unsupported.includes(wantedLabel)) {
       const wanted = formatOf(formatSel.value);
       let msg = `This browser cannot create ${unsupported.join(' or ')} files from a web page, so ${unsupported.length > 1 ? 'those options are' : 'that option is'} switched off.`;
       if (unsupported.includes(wanted.label)) {

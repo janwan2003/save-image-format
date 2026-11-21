@@ -12,6 +12,8 @@
 
 export const SITE_URL = 'https://janwan2003.github.io/save-image-format/';
 export const REPO_URL = 'https://github.com/janwan2003/save-image-format';
+// Live store listings (checked each session; Chrome went live 2026-11-21, Firefox AMO still in review).
+export const CWS_URL = 'https://chromewebstore.google.com/detail/saveform-save-image-as-pn/iimmananoageikphanfidapckaochlmn';
 
 const NO_UPLOAD = {
   q: 'Are my images uploaded anywhere?',
@@ -26,7 +28,7 @@ export const converters = [
     title: 'Image Converter: PNG, JPG, WebP, PDF, ICO – No Upload | Saveform',
     description: 'Free image converter that runs in your browser. Turn WebP, AVIF, HEIC, TIFF, PDF, PSD, camera RAW, PNG, JPG, GIF or SVG into PNG, JPG, WebP, AVIF, GIF, TIFF, PDF or ICO. No upload, no sign-up, batch ZIP download.',
     h1: 'Convert images to PNG, JPG, WebP, PDF and more',
-    lede: 'Drop in any image your browser can open (WebP, AVIF, PNG, JPG, GIF, SVG, BMP, ICO), a TIFF scan, the pages of a PDF or an iPhone HEIC photo and save it in the format you need, or combine several into one PDF or multi-page TIFF. You can also resize them or shrink them to a maximum file size. Conversion runs on your device, so nothing is uploaded.',
+    lede: 'Turn WebP, AVIF, HEIC, TIFF, PDF pages, PSD, camera RAW and everyday images into PNG, JPG, WebP, PDF, TIFF, SVG and more. Resize, shrink to a file size or combine into one PDF. It runs on your device, so nothing is uploaded.',
     svgOption: true,
     explainerTitle: 'Which format should I pick?',
     explainer: [
@@ -41,7 +43,7 @@ export const converters = [
       { q: 'How can it convert without uploading?', a: 'Modern browsers can decode images and save them again through the canvas API. This page uses exactly that, so your pictures never leave the browser tab.' },
       { q: 'Which input formats work?', a: 'Anything your browser can display: WebP, AVIF, PNG, JPG/JPEG, GIF (first frame), SVG, BMP and ICO, plus HEIC/HEIF photos from iPhones and TIFF files (including multi-page scans and faxes), which the page decodes itself because most browsers cannot. Each page of a PDF becomes an image too, camera RAW files (CR2, CR3, NEF, ARW, DNG and others) give the JPEG the camera stored inside them, and Photoshop PSD/PSB files give their flattened image.' },
       { q: 'Is any information about my images kept?', a: 'No. There are no analytics, no cookies and no accounts. Converted images exist only in your browser until you download them or close the tab.' },
-      { q: 'What is the Saveform extension?', a: 'A browser extension that adds Save as PNG, JPG, WebP or PDF to the right-click menu on any web image, using the same conversion code as this page.' },
+      { q: 'What is the Saveform extension?', a: 'A browser extension that adds Save as PNG, JPG, WebP or PDF to the right-click menu on any web image, using the same conversion code as this page. It is free in the Chrome Web Store (it also installs in Edge and Brave), and a Firefox version is in review.' },
     ],
   },
   {

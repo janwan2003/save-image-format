@@ -4,6 +4,9 @@ Right-click an image → **Save image as** → **PNG / JPG / WebP / PDF** (and *
 write it), or **Copy as PNG**. Or click the toolbar button (Alt+Shift+S) to see every image on the page and save
 the ones you pick as separate files, one ZIP or one PDF. The conversion happens on your device, inside the browser.
 
+**Install:** [Chrome Web Store](https://chromewebstore.google.com/detail/saveform-save-image-as-pn/iimmananoageikphanfidapckaochlmn)
+(also Edge, Brave and other Chromium browsers). Firefox: in review at addons.mozilla.org.
+
 Website with free in-browser converters (WebP to PNG, HEIC to JPG, PDF to JPG, AVIF to JPG, JPG to PDF, PNG to ICO, PNG to GIF, …):
 https://janwan2003.github.io/save-image-format/
 
@@ -31,14 +34,11 @@ https://janwan2003.github.io/save-image-format/
 | `offscreen` | Chrome only: renders SVG images, which the background worker cannot draw |
 | optional host access | asked per site, only when an image server blocks cross-site reads |
 
-## Install from source (until the store listings are live)
+## Run from source (development)
 
-1. Download this repository (Code → Download ZIP) and unzip it.
-2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick the
-   `extension` folder.
-
+Chrome: `chrome://extensions` → **Developer mode** → **Load unpacked** → the `extension` folder.
 Firefox (142+): `about:debugging` → This Firefox → Load Temporary Add-on → `extension/manifest.json`.
-Firefox: submitted to addons.mozilla.org on 2026-11-20 and waiting for Mozilla's review. The Firefox build passes the same end-to-end checks in real Firefox (`tests/firefox.test.mjs`).
+The Firefox build passes the same end-to-end checks in real Firefox (`tests/firefox.test.mjs`).
 
 ## Develop
 

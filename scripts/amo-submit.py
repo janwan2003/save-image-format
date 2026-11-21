@@ -6,6 +6,7 @@ Credentials: AMO_JWT_ISSUER / AMO_JWT_SECRET from the studio .env (never printed
 Usage: python3 scripts/amo-submit.py            # upload + create or add version
        python3 scripts/amo-submit.py --status   # show the add-on's review status
        python3 scripts/amo-submit.py --listing  # only update the listing summary/description
+       python3 scripts/amo-submit.py --previews # upload store screenshots AMO does not have yet
 """
 import base64, hashlib, hmac, json, sys, time, urllib.error, urllib.request, uuid
 from pathlib import Path
@@ -56,7 +57,7 @@ def call(method, path, data=None, files=None):
             parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
         for k, (name, content) in files.items():
             parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"; filename="{name}"\r\n'
-                         f'Content-Type: application/zip\r\n\r\n'.encode() + content + b"\r\n")
+                         f'Content-Type: {"image/png" if name.endswith(".png") else "application/zip"}\r\n\r\n'.encode() + content + b"\r\n")
         body = b"".join(parts) + f"--{boundary}--\r\n".encode()
         headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
     elif data is not None:
@@ -123,11 +124,42 @@ def main():
         sys.exit(1)
 
 
+# Store screenshots (1280x800) in listing order, with captions; matched to AMO previews by caption.
+PREVIEWS = [
+    ("docs/store/screenshot-1280x800.png", "Right-click an image, pick a format. Converted on your device."),
+    ("docs/store/screenshot-2-1280x800.png", "Save every image on a page as files, one ZIP or one PDF"),
+]
+
+
+def upload_previews():
+    code, a = call("GET", f"/addons/addon/{ADDON_ID}/")
+    if code != 200:
+        print("not found", code, a); return 1
+    have = [((p.get("caption") or {}).get("en-US") or "") for p in a.get("previews", [])]
+    print("AMO has", len(have), "preview(s):", have)
+    failed = 0
+    for i, (rel, caption) in enumerate(PREVIEWS):
+        if i < len(have):
+            continue  # AMO already has a screenshot in this position
+        path = ROOT / rel
+        code, res = call("POST", f"/addons/addon/{ADDON_ID}/previews/", {"position": str(i)},
+                         {"image": (path.name, path.read_bytes())})
+        print("preview", rel, code, json.dumps(res)[:300])
+        if code < 300:  # multipart cannot carry the translated caption object; set it with JSON
+            time.sleep(40)
+            code, res = call("PATCH", f"/addons/addon/{ADDON_ID}/previews/{res['id']}/", {"caption": {"en-US": caption}})
+            print("caption", code, json.dumps(res)[:200])
+        failed |= code >= 300
+    return failed
+
+
 def patch_listing():
     return call("PATCH", f"/addons/addon/{ADDON_ID}/", {"summary": {"en-US": SUMMARY}, "description": {"en-US": DESCRIPTION}})
 
 
 if __name__ == "__main__":
+    if "--previews" in sys.argv:
+        sys.exit(upload_previews())
     if "--listing" in sys.argv:
         code, res = patch_listing()
         print("listing", code, json.dumps(res)[:300] if code >= 300 else "updated")

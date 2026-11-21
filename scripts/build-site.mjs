@@ -8,7 +8,7 @@
 import { mkdir, readFile, readdir, writeFile, copyFile, rm, cp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { converters, SITE_URL, REPO_URL, FORMAT_LABEL } from '../site/pages.mjs';
+import { converters, SITE_URL, REPO_URL, CWS_URL, FORMAT_LABEL } from '../site/pages.mjs';
 import { guides } from '../site/guides.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -102,8 +102,10 @@ function toolHtml(page) {
   return `<div class="tool" data-tool${page.slug === '' ? ' data-general' : ''}${page.from === 'pdf' ? ' data-pdf-input' : ''}>
     <label class="drop" id="drop" for="file">
       ${ICON_UPLOAD}
-      <span class="drop-title">Drop ${esc(fromLabel)} here</span>
-      <span class="drop-sub"><span class="linkish">or choose files</span> · or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
+      <span class="drop-title drop-pointer">Drop ${esc(fromLabel)} here</span>
+      <span class="drop-sub drop-pointer"><span class="linkish">or choose files</span> · or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></span>
+      <span class="drop-title drop-touch">Choose ${esc(fromLabel)}</span>
+      <span class="drop-sub drop-touch">Tap here to pick from your photos or files</span>
       <input type="file" id="file" class="visually-hidden" multiple accept="image/*,.webp,.avif,.svg,.gif,.png,.jpg,.jpeg,.jfif,.bmp,.ico,.heic,.heif,.tif,.tiff,.pdf,application/pdf,.cr2,.cr3,.nef,.nrw,.arw,.dng,.raf,.orf,.rw2,.pef,.srw,.psd,.psb">
     </label>
     <div class="controls">
@@ -218,7 +220,7 @@ function calloutHtml(root, logo) {
   <div>
     <h2 id="ext-callout">Skip the converter next time</h2>
     <p>The free Saveform browser extension adds <strong>Save as PNG / JPG / WebP / PDF</strong> to the right-click menu on any image on the web, and saves every image on a page at once as files, a ZIP or one PDF. Same local conversion, no upload, no tracking.</p>
-    <a class="btn" href="${root}extension/">Get the extension</a>
+    <p class="callout-actions"><a class="btn" href="${CWS_URL}" rel="noopener">Add to Chrome, free</a> <a class="btn secondary" href="${root}extension/">How it works</a></p>
   </div>
 </aside>`;
 }
@@ -407,7 +409,7 @@ async function main() {
   }
 
   // Static content pages.
-  const contentVars = (root) => ({ root, repo: REPO_URL, updated: UPDATED, converterLinks: converterLinks(root, null) });
+  const contentVars = (root) => ({ root, repo: REPO_URL, cws: CWS_URL, updated: UPDATED, converterLinks: converterLinks(root, null) });
   await emit('privacy/index.html', render({
     slug: 'privacy', root: '../', nav: 'privacy',
     title: 'Privacy Policy | Saveform',
@@ -445,6 +447,8 @@ async function main() {
     copyFile(join(SITE, 'assets/psd-worker.js'), join(DIST, 'assets/psd-worker.js')),
     copyFile(join(SITE, 'assets/psd-client.js'), join(DIST, 'assets/psd-client.js')),
     copyFile(join(SITE, 'assets/icc.js'), join(DIST, 'assets/icc.js')),
+    copyFile(join(SITE, 'assets/ext-menu.webp'), join(DIST, 'assets/ext-menu.webp')),
+    copyFile(join(SITE, 'assets/ext-save-all.webp'), join(DIST, 'assets/ext-save-all.webp')),
     copyFile(join(ROOT, 'extension/lib/zip.js'), join(DIST, 'lib/zip.js')),
     copyFile(join(SITE, 'favicon.svg'), join(DIST, 'favicon.svg')),
     copyFile(join(SITE, 'og-image.png'), join(DIST, 'og-image.png')),

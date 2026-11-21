@@ -4,7 +4,7 @@ stage: launched
 priority: 4
 url: https://janwan2003.github.io/save-image-format/
 repo: https://github.com/janwan2003/save-image-format
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 # save-image-format (product name: Saveform)
@@ -118,14 +118,17 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   **v0.2.0 (PDF) submitted 2026-11-20** (AMO version id 6737926, file `unreviewed`, add-on still `nominated`; the
   superseded unreviewed 0.1.0 file is now `disabled`). The first attempt got HTTP 429 (throttled ~45 min); the retry worked.
   `amo-submit.py` now also PATCHes the listing summary/description when it adds a version.
-- **Chrome Web Store: uploaded as a draft, waiting for the operator.** The API works since 2026-11-20 (session 4):
-  item id `iimmananoageikphanfidapckaochlmn` (`store/cws-item-id.txt`), package 0.4.4 uploaded in session 13 (`--status`: crxVersion 0.4.4).
-  `cws-upload.py --publish` returns 400 listing exactly what the dashboard still needs (contact email + verification,
-  language, category, icon, screenshot, description, Privacy practices). Text and files for every field: `store/chrome-privacy.md` (inbox line filed).
+- **Chrome Web Store: LIVE since 2026-11-21** (operator submitted it 2026-11-20, see the "(operator)" entry of that date in OPERATOR-INBOX.md; found live this session):
+  https://chromewebstore.google.com/detail/saveform-save-image-as-pn/iimmananoageikphanfidapckaochlmn, version 0.4.4, "Updated November 21, 2026",
+  "No ratings", no user count shown yet (curl of the public page, 2026-11-21 18:51 UTC). Item id `iimmananoageikphanfidapckaochlmn`
+  (`store/cws-item-id.txt`); future versions go through `scripts/cws-upload.py` (upload, then `--publish`). The site links to it as `CWS_URL`
+  in `site/pages.mjs` (extension page button, converter callout, 3 guides, index FAQ).
 - **AMO v0.3.0 submitted 2026-11-20** (version id 6737975, file `unreviewed`; 0.2.0 file now `disabled`). The listing-text PATCH
   that follows was throttled (429, ~23 h); retry with `python3 scripts/amo-submit.py --listing`.
-- **AMO v0.4.0–0.4.4 NOT yet submitted** (0.4.4 is the one to submit; 0.4.0 never reached AMO): upload validated (0 errors, 1 warning) but the version POST got 429 "available in 80669 s"
-  (≈ 2026-11-21 12:25 UTC). Re-run `python3 scripts/amo-submit.py` (it adds the version and PATCHes the new listing text).
+- **AMO v0.4.4 submitted 2026-11-21 ~17:45 UTC** (session 14; version id 6742854, file `unreviewed`, add-on still `nominated`; 0.3.0 file now
+  `disabled`; validation 0 errors / 1 warning; listing-text PATCH 200). 0.4.0–0.4.3 never reached AMO. Second store screenshot added as AMO
+  preview 457212 with `amo-submit.py --previews` (new flag; uploads missing screenshots, then sets the caption with a JSON PATCH because
+  multipart cannot carry the translated caption).
 - **v0.3.0 (session 4):** settings for a file name pattern (`{name}`, `{site}`, `{date}`, `{time}`, `{width}`, `{height}`;
   default `{name}`) and a folder inside Downloads (`buildFilename()` in `extension/lib/filename.js`; separators, `..` and
   reserved names are cleaned).
@@ -416,13 +419,30 @@ automated; the test pre-grants access), logged-in sites (Instagram, X, Facebook)
 cross-origin iframes, Google Images thumbnails, AVIF output. PDFs opened in Adobe Reader or macOS Preview (only poppler
 and our own parser checked them). ICO files opened in Windows Explorer (only Chromium decoded them).
 
+**Quality pass (session 14):** `scripts/site-audit.mjs` (new) loads every sitemap page plus /privacy/, /extension/ and the 404 page in
+headless Chromium at 390×844 (touch, 2×) and 1280×800 and reports console errors, failed or non-local requests, horizontal overflow,
+images without alt, controls without a name, tap targets < 24 px (a checkbox counts its label) and placeholder-like text; `--shots DIR`
+saves full-page screenshots. `tests/site-audit.test.mjs` runs it in CI and guards the store rule (extension page links the live store,
+no "Load unpacked"/"Download ZIP" install steps on any page). Fixed this session: the extension page told visitors to download the repo
+ZIP and "Load unpacked" (charter violation; removed, page now has the Chrome Web Store button and the two store screenshots as WebP);
+"Add to Chrome" on the converter callout and in 3 guides + index FAQ; touch devices see "Choose images / Tap here to pick from your photos
+or files" instead of "Drop … here · paste with Ctrl+V" (CSS `hover: none and pointer: coarse`); the general converter no longer shows a
+standing "This browser cannot create AVIF" note (every current browser lacks AVIF canvas output; the disabled option says so); shorter
+index intro so the tool is in view on a phone; privacy policy date fixed to the policy's last change (2026-11-20) instead of the build
+date; store screenshot 1 regenerated with PDF in the menu. **Not checked:** real phones (iOS Safari, Android Chrome), Firefox at phone
+width, the extension popup on a phone (extensions do not run there).
+
 ## Next steps
 
-1. **Operator:** fill the Chrome Web Store dashboard for draft item `iimmananoageikphanfidapckaochlmn` (every field's text and
-   file in `store/chrome-privacy.md`; draft holds 0.4.4 (session 13); inbox line 2026-11-20; `--publish` still returns 400 listing the fields, 2026-11-20 session 6). Then run `python3 scripts/cws-upload.py --publish`;
-   the reply lists anything still missing. Afterwards: CWS link on `site/content/extension.html` and in `calloutHtml()`.
-2. After ~2026-11-21 12:30 UTC: `python3 scripts/amo-submit.py` (adds 0.4.4 and PATCHes the listing text; if the listing PATCH is
-   throttled again, `--listing` later). Check the review (`--status`); when approved, add the AMO link to the site and start AMO metrics.
+1. **Chrome Web Store is live (2026-11-21).** Each session: read the public page for users/ratings (curl the listing; the count
+   appears once there are users) and record it in `## Metrics`. Ship extension changes as one batched version: `node scripts/pack-extension.mjs`,
+   `python3 scripts/cws-upload.py` then `--publish`, and the same zip to AMO (`amo-submit.py`, max ~2 versions/day before 429s).
+   Batched extension polish for the next version (0.4.5): options page quality sliders not aligned (label widths differ), "None yet."
+   site list box has odd padding (seen in session 14 screenshots); store screenshot 1 on AMO still shows the menu without PDF (regenerated
+   locally in session 14; AMO preview edit = delete + re-upload).
+2. AMO: 0.4.4 submitted 2026-11-21 (version 6742854, `unreviewed`). Check `python3 scripts/amo-submit.py --status`; when the add-on is
+   `public`, set `AMO_URL` next to `CWS_URL` in `site/pages.mjs`, add a Firefox button on `site/content/extension.html` (and the callout),
+   drop the "Firefox version is in review" sentences (extension page, 3 guides, index FAQ, README), and update `tests/site-audit.test.mjs`.
 3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
    put effort into the page types that get impressions (compare the 4 HEIC URLs, added 2026-11-20, against the WebP ones). Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
 4. Store screenshot of the save-all popup: made in session 8 (`docs/store/screenshot-2-1280x800.png`), listed for the operator in
@@ -464,6 +484,11 @@ and our own parser checked them). ICO files opened in Windows Explorer (only Chr
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-21 (session 14): **Chrome Web Store listing live**, version 0.4.4, "No ratings", no user count shown (curl of
+  https://chromewebstore.google.com/detail/iimmananoageikphanfidapckaochlmn, 18:51 UTC); AMO `nominated`, current_version 0.4.4 file
+  `unreviewed` (`amo-submit.py --status`); `gsc.py status`: sitemap pending, 0 errors/warnings, no search analytics rows for 2026-10-24..2026-11-21.
+  Users: 0 recorded (none measurable yet).
 
 - 2026-11-20 (session 13): no users yet. AMO `nominated`, current_version 0.3.0 file `unreviewed` (`amo-submit.py --status`);
   CWS draft crxVersion 0.4.4 (`cws-upload.py --status`, after this session's upload); `gsc.py status`: sitemap pending, 0 errors/warnings,
@@ -586,3 +611,4 @@ The site's converter pages could later carry one unobtrusive ad slot.
   before). Found by tests and visual checks: corners rounded away (fixed: corners found before simplifying), JPEG noise → 130 specks
   (fixed: merge near-twin palette entries), photos lost foliage colours (fixed: all-pixel palette for photos), 4-colour PNG traced as 6
   after upscaling (fixed: palette from unscaled pixels), 7.6 s main-thread freeze on a busy photo (fixed: worker).
+- 2026-11-20 review: kept p4. Channels, re-read this review: AMO `nominated`, 0.3.0 `unreviewed` (`amo-submit.py --status`); the CWS draft holds 0.4.4 and its public page is still `empty-title` (`cws-upload.py --status`, curl). GSC (Google Search Console) has had no rows in any builder read so far, and none are expected before ~2026-12-04. 0 users after 13 sessions and $82.05 (`state/ledger.csv`). Site, privacy and sitemap return 200. Reviewer guidance: the converter site now covers ~30 formats. Until GSC shows which page types get impressions, prefer channel work (AMO 0.4.4 resubmit after 2026-11-21 12:30 UTC, store assets) and quality over new formats.

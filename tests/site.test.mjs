@@ -660,7 +660,10 @@ test('AVIF output option matches what the browser can encode', async () => {
   });
   const disabled = await page.locator('#format option[value="avif"]').evaluate((o) => o.disabled);
   assert.equal(disabled, !canAvif);
-  if (!canAvif) assert.match(await page.locator('#format-note').textContent(), /cannot create AVIF files/);
+  if (!canAvif) {
+    assert.match(await page.locator('#format option[value="avif"]').textContent(), /not available in this browser/);
+    assert.equal(await page.locator('#format-note').isVisible(), false, 'no standing note on the general converter');
+  }
   console.log(`# note: this Chromium ${canAvif ? 'can' : 'cannot'} encode AVIF; option ${disabled ? 'disabled' : 'enabled'}`);
   await page.close();
 });
@@ -975,7 +978,7 @@ test('heic-to-webp, avif-to-webp and the download-all guide build with their own
       assert.equal(await page.locator('[data-tool]').count(), 0, 'the guide has no embedded converter');
       const ext = page.locator('article .prose a[href="../extension/"]');
       assert.ok(await ext.count() >= 1, 'the guide links the extension page');
-      assert.match(await page.locator('article .prose').innerText(), /store listings are not live yet/);
+      assert.ok(await page.locator('article .prose a[href^="https://chromewebstore.google.com/detail/"]').count() >= 1, 'the guide links the live Chrome Web Store listing');
     }
     await page.close();
   }
