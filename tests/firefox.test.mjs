@@ -229,3 +229,14 @@ test('Firefox: save all images on the page as one ZIP (collect in page, batch on
   }
   assert.deepEqual(names.sort(), ['logo.png', 'photo.png', 'same.png']);
 });
+
+test('Firefox: settings page lays out its rows (sliders aligned, site list shown)', { skip }, async () => {
+  await wd('POST', '/window', { handle: extHandle });
+  await wd('POST', '/window/rect', { width: 900, height: 1100 });
+  await wd('POST', '/refresh', {});
+  for (let i = 0; i < 50 && !(await run(`return !!document.querySelector('#sites li');`)); i++) await new Promise((r) => setTimeout(r, 100));
+  const xs = await run(`return [...document.querySelectorAll('input[type=range]')].filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().left));`);
+  assert.ok(xs.length >= 2 && xs.every((x) => x === xs[0]), `slider left edges ${xs}`);
+  assert.match(await run(`return document.getElementById('sites').textContent;`), /127\.0\.0\.1|None yet/);
+  if (process.env.SHOTS) await writeFile(path.join(process.env.SHOTS, 'firefox-options.png'), Buffer.from(await wd('GET', '/screenshot'), 'base64'));
+});
