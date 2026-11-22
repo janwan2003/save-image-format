@@ -22,3 +22,28 @@ ul.sites li { display:flex; justify-content: space-between; align-items:center; 
 [hidden] { display: none !important; }
 .hint { font-size: 13px; margin: -6px 0 10px; }
 input[type=text], input[type=number], select { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); }
+a { color: var(--accent); }
+input[type=checkbox], input[type=radio], input[type=range], progress { accent-color: var(--accent); }
+input[type=color] { width: 44px; height: 30px; padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); cursor: pointer; }
+/* Settings page: cards of rows, label on the left and its control on the right, so controls line up. */
+.card.settings { padding: 4px 16px; }
+.settings > label, .settings .field > label { justify-content: space-between; margin: 0; padding: 10px 0; color: var(--fg); }
+.settings > label, .settings > .field { border-bottom: 1px solid var(--border); }
+.settings > :last-child { border-bottom: none; }
+.settings > label.check { justify-content: flex-start; }
+.settings input[type=text] { width: 16em; }
+.settings .hint { margin: -4px 0 10px; }
+.settings .slider { display: flex; align-items: center; gap: 10px; width: 16em; }
+.settings .slider output { width: 3em; text-align: right; font-variant-numeric: tabular-nums; }
+.settings .unit { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.settings .unit input { width: 6em; }
+.hint code { padding: 0; background: none; }
+ul.sites { margin: 0; }
+ul.sites li:last-child { border-bottom: none; }
+ul.sites li.empty { color: var(--muted); padding: 2px 0; }
+ul.sites code { word-break: break-all; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); margin: 0; padding: 8px 16px; border-radius: 8px;
+  background: var(--fg); color: var(--bg); font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+.toast:empty { display: none; }
+.foot { margin-top: 24px; }
+@media (max-width: 560px) { .settings > label, .settings .field > label { flex-wrap: wrap; } .settings input[type=text], .settings .slider { width: 100%; } }

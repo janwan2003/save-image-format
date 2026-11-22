@@ -26,7 +26,7 @@ async function renderSites() {
   const { origins = [] } = await chrome.permissions.getAll();
   list.replaceChildren();
   if (!origins.length) {
-    const li = document.createElement('li'); li.textContent = 'None yet.'; list.append(li); return;
+    const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'None yet. Saveform asks the first time a site blocks it.'; list.append(li); return;
   }
   for (const o of origins) {
     const li = document.createElement('li');

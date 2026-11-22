@@ -19,11 +19,13 @@ Fill them once; after that, updates and publishing go through the API.
 - **Language:** English
 - **Category:** Tools (if a "Photos" category is offered instead of/alongside Tools, either is fine; Tools preferred)
 - **Store icon (128×128):** `extension/icons/icon128.png`
-- **Screenshots (1280×800), upload both, in this order:**
+- **Screenshots (1280×800), upload all three, in this order:**
   1. `docs/store/screenshot-1280x800.png`: the right-click menu (Save image as → PNG / JPG / WebP). First, because it
      shows exactly what the listing name promises and what people searching "save image as PNG" want to see.
   2. `docs/store/screenshot-2-1280x800.png`: the "save all images on a page" popup (files / one ZIP / one PDF), the
      feature the best-known PNG-only competitor lacks.
+  3. `docs/store/screenshot-3-1280x800.png` (added 2026-11-22): the settings page (file names from site/date/size, a folder
+     inside Downloads, quality, PDF page size).
 - **Small promo tile (440×280):** `docs/store/promo-440x280.png`
 - **Detailed description:** paste the "Long description" block from `STORE.md` (everything between
   "Saveform adds…" and the Source link).

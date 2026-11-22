@@ -10,27 +10,33 @@
 <main>
   <h1><img src="icons/icon48.png" alt="">Saveform settings</h1>
   <p>Right-click any image, choose <b>Save image as</b>, then a format. To save several images from a page, click the Saveform button in the toolbar (or press <b>Alt+Shift+S</b>).</p>
-  <p> Images are converted on this device; Saveform makes no other network requests and collects nothing.</p>
+  <p>Images are converted on this device; Saveform makes no other network requests and collects nothing.</p>
 
   <h2>Saving</h2>
-  <label><input type="checkbox" id="askWhere"> Ask where to save each file (shows the Save dialog)</label>
-  <label>File name <input type="text" id="namePattern" spellcheck="false" placeholder="{name}" style="width:16em"></label>
-  <p class="hint">Use <code>{name}</code> (from the image address), <code>{site}</code>, <code>{date}</code>, <code>{time}</code>, <code>{width}</code>, <code>{height}</code>. Example: <code>{site} {date} {name}</code> → <code>example.com 2026-11-20 photo.png</code>.</p>
-  <label>Save into this folder inside Downloads <input type="text" id="subfolder" spellcheck="false" placeholder="(Downloads itself)" style="width:16em"></label>
+  <section class="card settings">
+    <label class="check"><input type="checkbox" id="askWhere"> Ask where to save each file (shows the Save dialog)</label>
+    <div class="field">
+      <label>File name <input type="text" id="namePattern" spellcheck="false" placeholder="{name}"></label>
+      <p class="hint">Use <code>{name}</code> (from the image address), <code>{site}</code>, <code>{date}</code>, <code>{time}</code>, <code>{width}</code>, <code>{height}</code>. Example: <code>{site} {date} {name}</code> → <code>example.com 2026-11-20 photo.png</code></p>
+    </div>
+    <label>Folder inside Downloads <input type="text" id="subfolder" spellcheck="false" placeholder="(Downloads itself)"></label>
+  </section>
 
   <h2>Quality</h2>
-  <label>JPG and PDF <input type="range" id="jpgQuality" min="10" max="100"> <output for="jpgQuality"></output></label>
-  <label>WebP <input type="range" id="webpQuality" min="10" max="100"> <output for="webpQuality"></output></label>
-  <label id="avifRow">AVIF <input type="range" id="avifQuality" min="10" max="100"> <output for="avifQuality"></output></label>
-  <label>JPG and PDF background for transparent areas <input type="color" id="jpgBackground"></label>
-  <label>PDF page size <select id="pdfPageSize"><option value="fit">Same as the image</option><option value="a4">A4</option><option value="letter">US Letter</option></select></label>
-  <label>Render SVG images at least <input type="number" id="svgMinSize" min="0" max="8192" step="64" style="width:6em"> px on the long side</label>
+  <section class="card settings">
+    <label>JPG and PDF <span class="slider"><input type="range" id="jpgQuality" min="10" max="100"> <output for="jpgQuality"></output></span></label>
+    <label>WebP <span class="slider"><input type="range" id="webpQuality" min="10" max="100"> <output for="webpQuality"></output></span></label>
+    <label id="avifRow">AVIF <span class="slider"><input type="range" id="avifQuality" min="10" max="100"> <output for="avifQuality"></output></span></label>
+    <label>Background for transparent areas (JPG and PDF) <input type="color" id="jpgBackground"></label>
+    <label>PDF page size <select id="pdfPageSize"><option value="fit">Same as the image</option><option value="a4">A4</option><option value="letter">US Letter</option></select></label>
+    <label>Render SVG images at least <span class="unit"><input type="number" id="svgMinSize" min="0" max="8192" step="64"> px wide or tall</span></label>
+  </section>
 
   <h2>Site access</h2>
   <p>Some image servers block extensions from reading images. Saveform then asks for access to that one site. Sites you allowed:</p>
-  <div class="card"><ul class="sites" id="sites"></ul></div>
-  <p class="status" id="status" role="status"></p>
-  <p><small>Saveform <span id="version"></span> · open source · <a href="https://github.com/janwan2003/save-image-format" target="_blank" rel="noopener">source code</a></small></p>
+  <section class="card"><ul class="sites" id="sites"></ul></section>
+  <p class="toast" id="status" role="status"></p>
+  <p class="foot"><small>Saveform <span id="version"></span> · open source · <a href="https://github.com/janwan2003/save-image-format" target="_blank" rel="noopener">source code</a></small></p>
 </main>
 <script type="module" src="options.js"></script>
 </body>

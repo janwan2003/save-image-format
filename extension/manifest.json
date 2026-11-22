@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Saveform: Save Image as PNG, JPG, WebP, PDF",
   "short_name": "Saveform",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "Save any image as PNG, JPG, WebP or PDF from the right-click menu, or every image on a page at once. Converted on your device.",
   "permissions": [
     "contextMenus",

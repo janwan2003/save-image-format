@@ -7,6 +7,7 @@ Usage: python3 scripts/amo-submit.py            # upload + create or add version
        python3 scripts/amo-submit.py --status   # show the add-on's review status
        python3 scripts/amo-submit.py --listing  # only update the listing summary/description
        python3 scripts/amo-submit.py --previews # upload store screenshots AMO does not have yet
+       python3 scripts/amo-submit.py --refresh-previews  # replace every AMO screenshot with docs/store's
 """
 import base64, hashlib, hmac, json, sys, time, urllib.error, urllib.request, uuid
 from pathlib import Path
@@ -128,6 +129,7 @@ def main():
 PREVIEWS = [
     ("docs/store/screenshot-1280x800.png", "Right-click an image, pick a format. Converted on your device."),
     ("docs/store/screenshot-2-1280x800.png", "Save every image on a page as files, one ZIP or one PDF"),
+    ("docs/store/screenshot-3-1280x800.png", "Settings: file names, a Downloads folder, quality and PDF page size"),
 ]
 
 
@@ -153,11 +155,36 @@ def upload_previews():
     return failed
 
 
+def refresh_previews():
+    """Upload the current screenshots, then delete the previews AMO had before (never leaves the listing empty)."""
+    code, a = call("GET", f"/addons/addon/{ADDON_ID}/")
+    if code != 200:
+        print("not found", code, a); return 1
+    old = [p["id"] for p in a.get("previews", [])]
+    print("AMO has previews", old)
+    for i, (rel, caption) in enumerate(PREVIEWS):
+        path = ROOT / rel
+        code, res = call("POST", f"/addons/addon/{ADDON_ID}/previews/", {"position": str(i)},
+                         {"image": (path.name, path.read_bytes())})
+        print("preview", rel, code, json.dumps(res)[:300])
+        if code >= 300:
+            return 1  # keep the old previews
+        time.sleep(40)
+        code, res = call("PATCH", f"/addons/addon/{ADDON_ID}/previews/{res['id']}/", {"caption": {"en-US": caption}})
+        print("caption", code, json.dumps(res)[:200])
+    for pid in old:
+        code, res = call("DELETE", f"/addons/addon/{ADDON_ID}/previews/{pid}/")
+        print("delete", pid, code)
+    return 0
+
+
 def patch_listing():
     return call("PATCH", f"/addons/addon/{ADDON_ID}/", {"summary": {"en-US": SUMMARY}, "description": {"en-US": DESCRIPTION}})
 
 
 if __name__ == "__main__":
+    if "--refresh-previews" in sys.argv:
+        sys.exit(refresh_previews())
     if "--previews" in sys.argv:
         sys.exit(upload_previews())
     if "--listing" in sys.argv:

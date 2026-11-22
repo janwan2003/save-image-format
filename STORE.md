@@ -1,17 +1,19 @@
 # Store listing (Chrome Web Store / Edge Add-ons / Firefox AMO)
 
-## Where it stands (2026-11-20)
+## Where it stands (2026-11-22)
 
 | Store | Package | State | How |
 |---|---|---|---|
-| Firefox AMO | `packages/saveform-0.4.3-firefox.zip` | 0.3.0 submitted, add-on id 3135549, status `nominated` (in Mozilla's review queue); 0.4.0 was validated (0 errors) but the version POST was throttled until ~2026-11-21 12:30 UTC; 0.4.3 (0.4.0 + lazy-loaded images in save-all + WebP size guard + lossless black-and-white/grey PDF pages) replaces it: re-run `python3 scripts/amo-submit.py` then; will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status` to check) |
-| Chrome Web Store | `packages/saveform-0.4.3-chrome.zip` | 0.4.3 uploaded (2026-11-20, session 9) to draft item `iimmananoageikphanfidapckaochlmn`; publishing waits for the operator to fill the dashboard (`store/chrome-privacy.md`) | `python3 scripts/cws-upload.py` (`--publish`, `--status`) |
+| Firefox AMO | `packages/saveform-<version>-firefox.zip` | add-on id 3135549, status `nominated` (Mozilla review queue); latest version see `--status` and VENTURE.md `## Status`; will appear at https://addons.mozilla.org/firefox/addon/saveform-save-image-as-png-jpg/ | `python3 scripts/amo-submit.py` (`--status`, `--listing`, `--previews`, `--refresh-previews`) |
+| Chrome Web Store | `packages/saveform-<version>-chrome.zip` | **live** since 2026-11-21: https://chromewebstore.google.com/detail/iimmananoageikphanfidapckaochlmn (0.4.4 public; 0.4.5 uploaded and submitted 2026-11-22). Updates: upload, then `--publish` (goes through Google review) | `python3 scripts/cws-upload.py` (`--publish`, `--status`) |
 | Edge Add-ons | same Chrome zip | needs a Partner Center account (operator) | dashboard upload |
 
-**Images** (`docs/store/`, rendered by `node scripts/store-assets.mjs`; `... popup` re-renders only screenshot 2):
+**Images** (`docs/store/`, rendered by `node scripts/store-assets.mjs`; `... popup` / `... options` re-render only screenshot 2 / 3):
 screenshot 1 `screenshot-1280x800.png` (right-click menu) first, screenshot 2 `screenshot-2-1280x800.png`
 (save-all popup: the real `extension/popup.html` with a stubbed `chrome` API and self-drawn sample images) second,
-promo tile `promo-440x280.png`. Upload both screenshots to every store (AMO currently has only the first).
+screenshot 3 `screenshot-3-1280x800.png` (the real `extension/options.html`: file names, Downloads folder, quality) third,
+promo tile `promo-440x280.png`. Upload all three screenshots to every store. AMO: `amo-submit.py --refresh-previews`
+replaces its set; the Chrome Web Store's screenshots can only be changed in the dashboard (operator).
 
 Build both zips with `node scripts/pack-extension.mjs`. The AMO listing text lives in `scripts/amo-submit.py`
 (it differs from the text below only in naming Firefox instead of Chrome and in leaving out AVIF).

@@ -5,6 +5,7 @@
 // drawn here as SVG (no third-party pictures).
 //   node scripts/store-assets.mjs          all images
 //   node scripts/store-assets.mjs popup    only docs/store/screenshot-2-1280x800.png
+//   node scripts/store-assets.mjs options  only docs/store/screenshot-3-1280x800.png (the real settings page)
 import { chromium } from 'playwright-core';
 import { readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -46,6 +47,7 @@ try {
 }
 const only = process.argv[2];
 if (!only || only === 'popup') await popupScreenshot();
+if (!only || only === 'options') await optionsScreenshot();
 if (only) { await browser.close(); process.exit(0); }
 const page = await browser.newPage({ deviceScaleFactor: 1 });
 for (const [name, html, w, h] of [['screenshot-1280x800.png', shot, 1280, 800], ['promo-440x280.png', tile, 440, 280]]) {
@@ -167,5 +169,56 @@ async function popupScreenshot() {
   await page.setContent(scene);
   await page.waitForFunction(() => [...document.images].every((i) => i.complete));
   await page.screenshot({ path: path.join(out, 'screenshot-2-1280x800.png') });
+  await page.close();
+}
+
+// ---------- screenshot 3: the settings page ----------
+
+async function optionsScreenshot() {
+  const EXT = 'https://saveform.test/';
+  const ctx = await browser.newContext({ viewport: { width: 600, height: 1000 }, deviceScaleFactor: 2, colorScheme: 'light' });
+  await ctx.route(`${EXT}**`, async (route) => {
+    const rel = new URL(route.request().url()).pathname.slice(1);
+    const types = { js: 'text/javascript', css: 'text/css', html: 'text/html', png: 'image/png', svg: 'image/svg+xml' };
+    try {
+      route.fulfill({ body: await readFile(path.join(root, 'extension', rel)), contentType: types[rel.split('.').pop()] || 'application/octet-stream' });
+    } catch { route.fulfill({ status: 404, body: '' }); }
+  });
+  await ctx.addInitScript(() => {
+    globalThis.chrome = {
+      storage: { sync: { get: async (d) => ({ ...d, askWhere: false, namePattern: '{site} {date} {name}', subfolder: 'Saveform', pdfPageSize: 'a4' }), set: async () => {} } },
+      permissions: { getAll: async () => ({ origins: ['https://images.example-cdn.com/*'] }), remove: async () => true },
+      runtime: { getManifest: () => ({ version: '0.4.5' }) },
+    };
+  });
+  const op = await ctx.newPage();
+  await op.goto(`${EXT}options.html`);
+  await op.waitForSelector('#sites li');
+  // From the "Saving" heading to the end of the Quality card.
+  const top = await op.locator('h2').first().boundingBox();
+  const cards = op.locator('section.card.settings');
+  const last = await cards.nth(1).boundingBox();
+  const clip = { x: last.x - 16, y: top.y - 12, width: last.width + 32, height: last.y + last.height - top.y + 28 };
+  const png = (await op.screenshot({ clip })).toString('base64');
+  await ctx.close();
+  const w = 620, h = Math.round(clip.height * (w / clip.width));
+  const scene = `<style>${css}</style>
+<div style="width:1280px;height:800px;background:linear-gradient(135deg,#1e3a8a,#2563eb);position:relative;overflow:hidden">
+  <div style="position:absolute;left:60px;top:140px;width:470px;color:#fff">
+    <img src="${icon}" width="64">
+    <h1 style="font-size:44px;line-height:1.12;margin:18px 0 14px">Files named<br>the way you want</h1>
+    <ul style="font-size:20px;line-height:1.9;padding-left:22px;opacity:.95;margin:0">
+      <li>File names from the site, date and size</li><li>Save straight into a Downloads folder</li><li>JPG, WebP and PDF quality</li><li>PDF pages in A4 or US Letter</li></ul>
+  </div>
+  <div style="position:absolute;left:${1220 - w}px;top:${Math.round((800 - h - 44) / 2)}px;width:${w}px;background:#fff;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden">
+    <div style="height:44px;background:#f1f3f4;display:flex;align-items:center;padding:0 14px;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#f87171"></span><span style="width:12px;height:12px;border-radius:50%;background:#fbbf24"></span><span style="width:12px;height:12px;border-radius:50%;background:#34d399"></span>
+      <span style="margin-left:12px;background:#fff;border-radius:14px;padding:4px 14px;font-size:13px;color:#555;flex:1">Saveform settings</span></div>
+    <img src="data:image/png;base64,${png}" width="${w}" height="${h}" style="display:block">
+  </div>
+</div>`;
+  const page = await browser.newPage({ deviceScaleFactor: 1, viewport: { width: 1280, height: 800 } });
+  await page.setContent(scene);
+  await page.waitForFunction(() => [...document.images].every((i) => i.complete));
+  await page.screenshot({ path: path.join(out, 'screenshot-3-1280x800.png') });
   await page.close();
 }

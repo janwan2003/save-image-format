@@ -89,6 +89,13 @@ test('settings page loads, saves a change, and lists granted sites', async () =>
   await opts.check('#askWhere');
   await opts.waitForFunction(() => document.getElementById('status').textContent === 'Saved');
   assert.equal(await sw.evaluate(async () => (await chrome.storage.sync.get('askWhere')).askWhere), true);
+  // "Saved" is a toast inside the viewport, not a line at the bottom of a long page.
+  const toast = await opts.locator('#status').boundingBox();
+  const vh = await opts.evaluate(() => innerHeight);
+  assert.ok(toast && toast.y > 0 && toast.y + toast.height <= vh, `toast in view: ${JSON.stringify(toast)}`);
+  // Quality sliders line up (session 15: they started wherever their label text ended).
+  const xs = await opts.$$eval('input[type=range]', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().left)));
+  assert.ok(xs.length >= 2 && xs.every((x) => x === xs[0]), `slider left edges ${xs}`);
   assert.equal(await opts.inputValue('#namePattern'), '{name}');
   await opts.fill('#namePattern', '{site} {name}');
   await opts.fill('#subfolder', 'Saveform');
