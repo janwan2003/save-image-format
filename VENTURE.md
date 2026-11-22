@@ -4,7 +4,7 @@ stage: launched
 priority: 4
 url: https://janwan2003.github.io/save-image-format/
 repo: https://github.com/janwan2003/save-image-format
-updated: 2026-11-21
+updated: 2026-11-22
 ---
 
 # save-image-format (product name: Saveform)
@@ -89,7 +89,7 @@ users. The biggest one has not been updated in 2.5 years and only does PNG.
 
 Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Format" is an existing listing, so not used).
 
-**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.4 (= 0.4.3 behaviour; ships the shared `lib/trace.js` and the extended `png-quant.js` because `convert.js` imports them; SVG is not in the extension menu); 0.4.2 = 0.4.1 + WebP outputs above 16,383 px refused with a clear message instead of Chromium silently cropping them; 0.4.3 = PDF pages that are pure black and white stored losslessly at 1 bit, grey pages at 8-bit grey (shared `lib/pdf.js`), plus `lib/tiff-write.js` shipped because `convert.js` imports it; TIFF is not in the extension menu):
+**Extension** (`extension/`, MV3, no build step, no dependencies, v0.4.5 (session 15: = 0.4.4 behaviour with a redesigned settings page: rows in cards with the control on the right so the quality sliders line up, accent-coloured controls, an empty-state line for the site list, "Saved" as a toast in view); 0.4.4 (= 0.4.3 behaviour; ships the shared `lib/trace.js` and the extended `png-quant.js` because `convert.js` imports them; SVG is not in the extension menu); 0.4.2 = 0.4.1 + WebP outputs above 16,383 px refused with a clear message instead of Chromium silently cropping them; 0.4.3 = PDF pages that are pure black and white stored losslessly at 1 bit, grey pages at 8-bit grey (shared `lib/pdf.js`), plus `lib/tiff-write.js` shipped because `convert.js` imports it; TIFF is not in the extension menu):
 - Right-click image → Save image as → PNG / JPG / WebP / PDF (AVIF only where the browser's canvas can
   write it; Chrome 159 cannot, so not shown there) / Copy as PNG. PDF (added in v0.2.0) = one page, page size
   set in settings (same as image by default, or A4 / US Letter), JPEG quality shared with JPG.
@@ -109,8 +109,8 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
 - SVG rendered via an offscreen document (Chrome) at ≥1024 px; JPG fills transparency with a chosen colour;
   settings page (quality, Save dialog on/off, file name pattern, Downloads subfolder, granted sites); errors shown as an in-page notice.
 - One manifest serves Chrome and Firefox (`background.scripts` + `service_worker`, gecko id, min Firefox 142).
-- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-0.4.4-chrome.zip` and
-  `packages/saveform-0.4.4-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
+- Store zips: `node scripts/pack-extension.mjs` → `packages/saveform-<version>-chrome.zip` and
+  `packages/saveform-<version>-firefox.zip` (Firefox: manifest without `service_worker`/`offscreen`, plus `clipboardWrite`;
   offscreen files left out). Listing text and permission justifications in `STORE.md`; images in `docs/store/`.
 - **Firefox AMO: submitted 2026-11-20** with `scripts/amo-submit.py` (AMO API v5): add-on id 3135549, slug
   `saveform-save-image-as-png-jpg`, status `nominated` (Mozilla review queue), version 0.1.0 file `unreviewed`,
@@ -129,6 +129,11 @@ Product name **Saveform** (the slug stays `save-image-format`; "Save Image As Fo
   `disabled`; validation 0 errors / 1 warning; listing-text PATCH 200). 0.4.0–0.4.3 never reached AMO. Second store screenshot added as AMO
   preview 457212 with `amo-submit.py --previews` (new flag; uploads missing screenshots, then sets the caption with a JSON PATCH because
   multipart cannot carry the translated caption).
+- **0.4.5 (session 15, 2026-11-22):** CWS: uploaded (`uploadState SUCCESS`) and `--publish` → `OK` (Google review; public page still showed
+  0.4.4 at session end). AMO: upload validated (0 errors / 1 warning) but the version POST got 429 "available in 6781 seconds"; a detached
+  one-shot retry (`.scratch/amo-retry.py`, log `.scratch/amo-retry.log`, fires ~17:43 UTC) submits it and finishes the preview swap. AMO
+  previews at session end: 457972 (menu, pos 0), 457973 (save-all, pos 1), plus the stale save-all 457212 that the retry deletes before adding
+  screenshot 3 (settings page). Check with `amo-submit.py --status` and the log.
 - **v0.3.0 (session 4):** settings for a file name pattern (`{name}`, `{site}`, `{date}`, `{time}`, `{width}`, `{height}`;
   default `{name}`) and a folder inside Downloads (`buildFilename()` in `extension/lib/filename.js`; separators, `..` and
   reserved names are cleaned).
@@ -437,16 +442,16 @@ width, the extension popup on a phone (extensions do not run there).
 1. **Chrome Web Store is live (2026-11-21).** Each session: read the public page for users/ratings (curl the listing; the count
    appears once there are users) and record it in `## Metrics`. Ship extension changes as one batched version: `node scripts/pack-extension.mjs`,
    `python3 scripts/cws-upload.py` then `--publish`, and the same zip to AMO (`amo-submit.py`, max ~2 versions/day before 429s).
-   Batched extension polish for the next version (0.4.5): options page quality sliders not aligned (label widths differ), "None yet."
-   site list box has odd padding (seen in session 14 screenshots); store screenshot 1 on AMO still shows the menu without PDF (regenerated
-   locally in session 14; AMO preview edit = delete + re-upload).
-2. AMO: 0.4.4 submitted 2026-11-21 (version 6742854, `unreviewed`). Check `python3 scripts/amo-submit.py --status`; when the add-on is
+   0.4.5 (settings page redesign) went to CWS review on 2026-11-22; confirm the public page shows 0.4.5. Next batched extension polish:
+   the popup's "N smaller images are hidden." line could join the count row; nothing else known.
+2. AMO: 0.4.4 submitted 2026-11-21 (version 6742854, `unreviewed`); 0.4.5 left to a detached retry on 2026-11-22 (see Status): first read
+   `.scratch/amo-retry.log`, and if it failed run `python3 scripts/amo-submit.py` then fix previews (wanted: menu, save-all, settings). Check `python3 scripts/amo-submit.py --status`; when the add-on is
    `public`, set `AMO_URL` next to `CWS_URL` in `site/pages.mjs`, add a Firefox button on `site/content/extension.html` (and the callout),
    drop the "Firefox version is in review" sentences (extension page, 3 guides, index FAQ, README), and update `tests/site-audit.test.mjs`.
 3. From ~2026-12-04: `python3 scripts/gsc.py status` for impressions/clicks per page; record them in `## Metrics`, and
    put effort into the page types that get impressions (compare the 4 HEIC URLs, added 2026-11-20, against the WebP ones). Re-run `scripts/indexnow.py` and `gsc.py sitemap` after adding pages.
-4. Store screenshot of the save-all popup: made in session 8 (`docs/store/screenshot-2-1280x800.png`), listed for the operator in
-   `store/chrome-privacy.md`. Still to do: add it to AMO (not yet supported by `amo-submit.py`) when 0.4.4 is submitted.
+4. Store screenshots: 3 now (menu, save-all popup, settings page from session 15). The CWS listing has only what the operator uploaded;
+   screenshot 3 is listed in `store/chrome-privacy.md` and requested in OPERATOR-INBOX.md (optional).
 4a. TIFF follow-ups (lossless fax PDF pages, thumbnail skip, TIFF output and the multi-page guide done in session 9): CCITT G4
    output for 1-bit TIFF pages (fax systems want it; LZW 1-bit is ~same size as G3 input only by luck), a DPI setting for TIFF/PDF output
    (print shops ask for 300 dpi; we write 72), speed up LZW decoding (24 MP noise: 4 s), an "open TIFF files on Windows/Mac" guide,
@@ -484,6 +489,11 @@ width, the extension popup on a phone (extensions do not run there).
    access, which we refuse). Save-all is the premium candidate in `## Monetization plan` (still free; rule 4).
 
 ## Metrics
+
+- 2026-11-22 (session 15): Chrome Web Store public page: version 0.4.4, "No ratings", no user count shown (curl of
+  https://chromewebstore.google.com/detail/iimmananoageikphanfidapckaochlmn, ~15:20 UTC); `cws-upload.py --status` crxVersion 0.4.5 after this
+  session's upload; AMO `nominated`, current_version 0.4.4 file `unreviewed` (`amo-submit.py --status`); `gsc.py status`: 0 errors/warnings,
+  no search analytics rows for 2026-10-25..2026-11-22. Users: none measurable yet.
 
 - 2026-11-21 (session 14): **Chrome Web Store listing live**, version 0.4.4, "No ratings", no user count shown (curl of
   https://chromewebstore.google.com/detail/iimmananoageikphanfidapckaochlmn, 18:51 UTC); AMO `nominated`, current_version 0.4.4 file
@@ -622,3 +632,15 @@ The site's converter pages could later carry one unobtrusive ad slot.
   touch: store button href = CWS listing, WebP → PNG converted, 0 console errors, requests only to github.io; IndexNow 70 URLs (200);
   `gsc.py status`: no rows yet. Screenshots looked at: index, /webp-to-png/ with 2 results (light/dark), /extension/, guides, privacy,
   404, png-to-svg, compress, pdf-to-jpg, favicon (phone), extension options page (light).
+- 2026-11-21 review: kept p4. **Live on Chrome Web Store** (0.4.4, public page 200, no user count shown yet); AMO `nominated`, 0.4.4 file `unreviewed` (`amo-submit.py --status`); site 200, 0 console errors; Search Console 0 impressions 11-01→11-21. First venture with a real store channel; read the CWS dashboard user count each session.
+- 2026-11-22 review: kept p4. URL 200, 0 console errors (headless Chromium, 390 px, 2026-11-22 ~03:40 UTC); Search Console 0 impressions 11-01→11-22. Chrome Web Store public page: 0.4.4, no ratings, no user count shown; AMO `nominated`, 0.4.4 `unreviewed` (`amo-submit.py --status`). Only the store channel can show traction; spend sessions on the listing, not more pages.
+- 2026-11-22 builder (session 15, quality): extension **0.4.5** = redesigned settings page (the session-14 defects: quality sliders started
+  wherever their label ended, "None yet." sat in an oddly padded box; also unthemed controls and a "Saved" line far below the fold). Now cards of
+  rows, control on the right, accent-coloured inputs, an empty-state line, a "Saved" toast. Third store screenshot (`store-assets.mjs options`,
+  the real options page); `amo-submit.py --refresh-previews`. CWS 0.4.5 uploaded + published (review); AMO 0.4.5 validated but throttled
+  (429, ~1.9 h) → detached retry. Evidence: local `npm test` 214 / 213 pass / 0 fail / 1 skipped before and after the change; Actions run
+  45039482978 (e099b47) 214 / 213 pass / 0 fail / 1 skipped, Pages run 45039482979 success; new assertions (slider left edges equal, toast in
+  viewport) in `extension-granted.test.mjs`, new Firefox test (10/10 pass in real Firefox via geckodriver); screenshots looked at: options page
+  light/dark in Chromium (800 px), options page in Firefox, save-all popup light/dark at 560 px, grant window at 560 px, store screenshot 3.
+  Live site: /, /extension/, /privacy/, /webp-to-png/, /heic-to-jpg/, sitemap 200 (curl; the site was not changed this session, so no new
+  browser audit). Not verified: Safari/WebKit (not installed; 2.3 GB disk free), the 0.4.5 package as installed from either store.
